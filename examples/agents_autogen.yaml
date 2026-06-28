@@ -1,0 +1,11 @@
+framework: autogen
+topic: Example coding task
+roles:
+  coder:
+    role: Python Developer
+    goal: Write clean Python code
+    backstory: Senior engineer
+    tasks:
+      code:
+        description: Write a hello world script for {topic}
+        expected_output: Python code with explanation
