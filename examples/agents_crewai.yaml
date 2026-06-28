@@ -1,0 +1,11 @@
+framework: crewai
+topic: Example research task
+roles:
+  researcher:
+    role: Research Analyst
+    goal: Gather accurate information
+    backstory: Expert researcher
+    tasks:
+      research:
+        description: Research {topic}
+        expected_output: A short summary
