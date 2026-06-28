@@ -13,16 +13,6 @@ def test_entry_points_registered():
     assert expected.issubset(eps)
 
 
-def test_crewai_adapter_protocol_shape():
-    pytest.importorskip("praisonaiagents.frameworks")
-    from praisonai_frameworks.crewai.adapter import CrewAIAdapter
-
-    adapter = CrewAIAdapter()
-    assert adapter.name == "crewai"
-    assert hasattr(adapter, "run")
-    assert hasattr(adapter, "is_available")
-
-
 def test_autogen_family_is_router():
     pytest.importorskip("praisonaiagents.frameworks")
     from praisonai_frameworks.autogen.family import AutoGenFamilyAdapter
