@@ -50,6 +50,28 @@ def test_ensure_utf8_console_reconfigures_on_windows(monkeypatch):
     assert err.encoding == "utf-8"
 
 
+def test_ensure_utf8_console_skips_already_utf8(monkeypatch):
+    monkeypatch.setattr(crewai_adapter._sys, "platform", "win32")
+    out, err = _FakeStream(), _FakeStream()
+    out.encoding = "utf-8"
+    err.encoding = "UTF-8"
+    monkeypatch.setattr(crewai_adapter._sys, "stdout", out)
+    monkeypatch.setattr(crewai_adapter._sys, "stderr", err)
+
+    crewai_adapter._ensure_utf8_console()
+
+    assert out.reconfigure_calls == []
+    assert err.reconfigure_calls == []
+
+
+def test_ensure_utf8_console_handles_none_streams(monkeypatch):
+    monkeypatch.setattr(crewai_adapter._sys, "platform", "win32")
+    monkeypatch.setattr(crewai_adapter._sys, "stdout", None)
+    monkeypatch.setattr(crewai_adapter._sys, "stderr", None)
+
+    crewai_adapter._ensure_utf8_console()
+
+
 def test_ensure_utf8_console_handles_missing_reconfigure(monkeypatch):
     monkeypatch.setattr(crewai_adapter._sys, "platform", "win32")
     monkeypatch.setattr(crewai_adapter._sys, "stdout", _NoReconfigureStream())

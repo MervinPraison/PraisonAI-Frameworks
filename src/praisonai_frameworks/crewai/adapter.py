@@ -26,6 +26,11 @@ def _ensure_utf8_console() -> None:
     if _sys.platform != "win32":
         return
     for stream in (_sys.stdout, _sys.stderr):
+        if stream is None:
+            continue
+        encoding = getattr(stream, "encoding", None)
+        if encoding and encoding.lower() in ("utf-8", "utf8"):
+            continue
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:
             continue
