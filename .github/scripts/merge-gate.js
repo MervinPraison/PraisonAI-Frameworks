@@ -49,7 +49,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function isFinalClaudeTriggerComment(c) {
   const body = (c.body || '').toLowerCase();
-  if (!AUTO_ACTORS.includes(c.user.login)) return false;
+  if (!AUTO_ACTORS.includes(c.user?.login)) return false;
   if (!body.includes('@claude')) return false;
   if (body.includes('merge conflict')) return false;
   return body.includes('final architecture reviewer') || body.includes('lead engineer');
@@ -66,7 +66,7 @@ function isClaudeTriggerNoise(c) {
 function hasRecentClaudeTrigger(comments, minutes = 35) {
   const cutoff = Date.now() - minutes * 60 * 1000;
   return comments.some((c) => {
-    if (!CLAUDE_TRIGGER_LOGINS.includes(c.user.login)) return false;
+    if (!CLAUDE_TRIGGER_LOGINS.includes(c.user?.login)) return false;
     if (isClaudeTriggerNoise(c)) return false;
     if (!(c.body || '').includes('@claude')) return false;
     return new Date(c.created_at).getTime() > cutoff;
@@ -74,7 +74,7 @@ function hasRecentClaudeTrigger(comments, minutes = 35) {
 }
 
 function isConflictRebaseTriggerComment(c) {
-  if (!AUTO_ACTORS.includes(c.user.login)) return false;
+  if (!AUTO_ACTORS.includes(c.user?.login)) return false;
   const body = (c.body || '').toLowerCase();
   return body.includes('@claude') && body.includes('merge conflict');
 }
@@ -172,7 +172,7 @@ function isStaleFinalAfterPush(comments, headPushedAt) {
   const finalTime = new Date(latestFinal.created_at).getTime();
   if (headTime <= finalTime + 60000) return false;
   const claudeSinceHead = comments.some((c) => {
-    if (!CLAUDE_TRIGGER_LOGINS.includes(c.user.login)) return false;
+    if (!CLAUDE_TRIGGER_LOGINS.includes(c.user?.login)) return false;
     if (isClaudeTriggerNoise(c)) return false;
     if (!(c.body || '').includes('@claude')) return false;
     return new Date(c.created_at).getTime() >= headTime - 60000;
@@ -248,7 +248,10 @@ async function allChecksGreenOnSha(github, owner, repo, sha, core) {
     ref: sha,
     per_page: 100,
   });
-  const runs = (data.check_runs || []).filter((r) => r.head_sha === sha);
+  const currentWorkflow = process.env.GITHUB_WORKFLOW;
+  const runs = (data.check_runs || []).filter(
+    (r) => r.head_sha === sha && r.name !== currentWorkflow
+  );
   if (runs.length === 0) {
     core?.info?.(`No check runs on ${sha.slice(0, 7)} — allowing (e.g. docs-only PR)`);
     return true;

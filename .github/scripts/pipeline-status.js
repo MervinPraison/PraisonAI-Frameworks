@@ -198,13 +198,20 @@ async function syncOpenPullRequests(github, owner, repo, options, core) {
       state: 'open',
       per_page: 100,
     }));
-  } else {
+  } else if (typeof github.paginate === 'function') {
     prs = await github.paginate(github.rest.pulls.list, {
       owner,
       repo,
       state: 'open',
       per_page: 100,
     });
+  } else {
+    ({ data: prs } = await github.rest.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    }));
   }
   let synced = 0;
   const readyCandidates = [];
