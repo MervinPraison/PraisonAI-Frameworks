@@ -126,6 +126,7 @@ See also: [docs/adding-a-framework.md](docs/adding-a-framework.md), [examples/th
 | `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` |
 | `openai_agents` | `[openai-agents]` | `openai_agents.adapter:OpenAIAgentsAdapter` |
 | `agno` | `[agno]` | `agno.adapter:AgnoAdapter` |
+| `google_adk` | `[google-adk]` | `google_adk.adapter:GoogleAdkAdapter` |
 
 Family routers implement `resolve()` to pick a concrete adapter from config/version.
 
@@ -147,6 +148,9 @@ pytest tests/integration/openai_agents_adapter -q
 
 pip install -e ".[agno]"
 pytest tests/integration/agno_adapter -q
+
+pip install -e ".[google-adk]"
+pytest tests/integration/google_adk_adapter -q
 ```
 
 | Layer | Location | Gate |
@@ -156,7 +160,7 @@ pytest tests/integration/agno_adapter -q
 | Integration | `tests/integration/<name>_adapter/` | `pytest.importorskip("<pkg>")` |
 | Live API | `test_*_live.py` | `OPENAI_API_KEY`; optional `PRAISONAI_LIVE_TESTS` |
 
-**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph", "openai-agents", "agno"]` — unit tests run on **every** row; do not require optional deps on the crewai/autogen rows.
+**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph", "openai-agents", "agno", "google-adk"]` — unit tests run on **every** row; do not require optional deps on the crewai/autogen rows.
 
 ---
 

@@ -15,5 +15,9 @@ def test_agno_probe_does_not_raise():
     assert isinstance(is_available("agno"), bool)
 
 
+def test_google_adk_probe_does_not_raise():
+    assert isinstance(is_available("google_adk"), bool)
+
+
 def test_unknown_framework_returns_false():
     assert is_available("unknown_xyz") is False
