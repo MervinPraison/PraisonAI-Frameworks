@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -326,3 +327,20 @@ def test_google_adk_to_adk_tool_does_not_mutate_shared_callable():
     assert shared_tool.__doc__ == original_doc
     assert wrapped is not None
     assert wrapped.__name__ == original_name
+
+
+def test_google_adk_invoke_agent_uses_thread_when_loop_running():
+    adapter = GoogleAdkAdapter()
+    mock_agent = MagicMock()
+
+    async def _mock_async(*_args, **_kwargs):
+        return "ok"
+
+    with patch.object(adapter, "_invoke_agent_async", side_effect=_mock_async):
+
+        async def _call_from_async_context():
+            return adapter._invoke_agent(mock_agent, "hi", [{"api_key": "k"}])
+
+        result = asyncio.run(_call_from_async_context())
+
+    assert result == "ok"

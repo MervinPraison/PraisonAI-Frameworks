@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import os
 import re
@@ -333,8 +334,22 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
     def _invoke_agent(
         self, agent, message: str, llm_config: Optional[List[Dict]] = None
     ) -> str:
+        coro = self._invoke_agent_async(agent, message, llm_config)
+
+        def _run_coro() -> str:
+            return asyncio.run(coro)
+
         try:
-            return asyncio.run(self._invoke_agent_async(agent, message, llm_config))
+            asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                return _run_coro()
+            except Exception as exc:
+                raise RuntimeError(f"Google ADK agent invocation failed: {exc}") from exc
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(_run_coro).result()
         except Exception as exc:
             raise RuntimeError(f"Google ADK agent invocation failed: {exc}") from exc
 
