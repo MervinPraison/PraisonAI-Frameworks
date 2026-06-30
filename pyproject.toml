@@ -40,8 +40,6 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 crewai = "praisonai_frameworks.crewai.adapter:CrewAIAdapter"
 autogen = "praisonai_frameworks.autogen.family:AutoGenFamilyAdapter"
 autogen_v2 = "praisonai_frameworks.autogen.adapter_v2:AutoGenAdapter"
-autogen_v4 = "praisonai_frameworks.autogen.adapter_v4:AutoGenV4Adapter"
-ag2 = "praisonai_frameworks.autogen.adapter_ag2:AG2Adapter"
 
 [project.urls]
 Homepage = "https://praison.ai/docs"
