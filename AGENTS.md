@@ -41,7 +41,7 @@ without shipping CrewAI, AutoGen, or LangGraph inside the core SDK or wrapper wh
 **Reject in this repo:**
 
 - Vendoring or copying `praisonaiagents` source
-- Module-level imports of `crewai`, `autogen`, `langgraph`, `langchain_*`
+- Module-level imports of `crewai`, `autogen`, `langgraph`, `langchain_*`, `agents`
 - Bloating `base.py` with framework-specific logic (keep per-adapter helpers local)
 - Workflow YAML dispatch (`process: workflow` stays PraisonAI-native in the wrapper)
 
@@ -106,7 +106,7 @@ def run(
 5. Tests:
    - `tests/unit/test_<name>_adapter_protocol.py` — always runs (no optional deps).
    - `tests/unit/test_<name>_adapter_run.py` — mock `run()`; **must not import optional deps** on base CI matrix (patch helpers or use `pytest.importorskip`).
-   - `tests/integration/<name>_adapter/` — **never name the folder `langgraph/`** (shadows PyPI `langgraph`); use `langgraph_adapter/`.
+   - `tests/integration/<name>_adapter/` — **never name the folder `langgraph/` or `agents/`** (shadows PyPI packages); use `langgraph_adapter/`, `openai_agents_adapter/`.
    - Update `tests/unit/test_entry_points_registered.py`.
 6. Document install in root `README.md`.
 
@@ -116,16 +116,15 @@ See also: [docs/adding-a-framework.md](docs/adding-a-framework.md), [examples/th
 
 ## 5. Registered frameworks
 
-| Entry point | Extra | Adapter module | Status |
-|-------------|-------|----------------|--------|
-| `crewai` | `[crewai]` | `crewai.adapter:CrewAIAdapter` | Registered |
-| `autogen` | `[autogen]` | `autogen.family:AutoGenFamilyAdapter` (router) | Registered |
-| `autogen_v2` | `[autogen]` | `autogen.adapter_v2:AutoGenAdapter` | Registered |
-| `autogen_v4` | `[autogen-v4]` | stub / placeholder | **Planned** — extra exists, entry point not yet registered |
-| `ag2` | `[ag2]` | stub / placeholder | **Planned** — extra exists, entry point not yet registered |
-| `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` | **Planned** — register on merge |
-
-Only rows marked *Registered* currently appear under `[project.entry-points."praisonai.framework_adapters"]` in `pyproject.toml`. *Planned* rows are documented intent; add the entry point (and extra, if missing) when the adapter lands.
+| Entry point | Extra | Adapter module |
+|-------------|-------|----------------|
+| `crewai` | `[crewai]` | `crewai.adapter:CrewAIAdapter` |
+| `autogen` | `[autogen]` | `autogen.family:AutoGenFamilyAdapter` (router) |
+| `autogen_v2` | `[autogen]` | `autogen.adapter_v2:AutoGenAdapter` |
+| `autogen_v4` | `[autogen-v4]` | stub / placeholder |
+| `ag2` | `[ag2]` | stub / placeholder |
+| `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` |
+| `openai_agents` | `[openai-agents]` | `openai_agents.adapter:OpenAIAgentsAdapter` |
 
 Family routers implement `resolve()` to pick a concrete adapter from config/version.
 
@@ -145,6 +144,9 @@ pip install -e ".[dev]" && pytest tests/unit -q
 # Per-framework
 pip install -e ".[langgraph]"
 pytest tests/integration/langgraph_adapter -q
+
+pip install -e ".[openai-agents]"
+pytest tests/integration/openai_agents_adapter -q
 ```
 
 > The `praisonai-package/` directory only exists in the CI multi-repo checkout. For local development, `pip install -e ".[dev]"` pulls `praisonaiagents` from PyPI — no extra checkout required.
@@ -156,7 +158,7 @@ pytest tests/integration/langgraph_adapter -q
 | Integration | `tests/integration/<name>_adapter/` | `pytest.importorskip("<pkg>")` |
 | Live API | `test_*_live.py` | `OPENAI_API_KEY`; optional `PRAISONAI_LIVE_TESTS` |
 
-**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph"]` — unit tests run on **every** row, including the base row (`extra: ""`). Therefore unit tests must **not** require any optional dependency (e.g. `langchain_core`, `crewai`); use `pytest.importorskip` or patch helpers so they pass on the base row where no extra is installed.
+**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph", "openai-agents"]` — unit tests run on **every** row; do not require optional deps on the crewai/autogen rows.
 
 ---
 
@@ -183,7 +185,8 @@ src/praisonai_frameworks/
 ├── _telemetry.py        # Optional telemetry suppress
 ├── crewai/              # CrewAI adapter
 ├── autogen/             # AutoGen family + v2/v4/ag2
-└── langgraph/           # LangGraph adapter
+├── langgraph/           # LangGraph adapter
+└── openai_agents/       # OpenAI Agents SDK adapter
 
 tests/unit/              # Always-on tests
 tests/integration/       # Per-extra integration (use *_adapter dir names)

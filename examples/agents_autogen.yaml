@@ -7,6 +7,5 @@ roles:
     backstory: Senior engineer
     tasks:
       code:
-        agent: coder
         description: Write a hello world script for {topic}
         expected_output: Python code with explanation

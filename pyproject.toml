@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "praisonai-frameworks"
-version = "0.1.2"
+version = "0.1.4"
 description = "Optional agent framework adapters for PraisonAI (CrewAI, AutoGen, extensions)"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10,<3.15"
 authors = [{ name = "Mervin Praison" }]
-keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "framework"]
+keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "framework", "openai-agents", "langgraph"]
 dependencies = [
     "praisonaiagents>=1.6.82",
 ]
@@ -35,14 +35,15 @@ autogen-v4 = [
     "crewai",
 ]
 langgraph = [
-    "langgraph>=0.2.0,<2",
-    "langgraph-prebuilt>=0.2.0,<2",
-    "langchain>=0.3.0,<2",
-    "langchain-core>=0.3.0,<2",
-    "langchain-openai>=0.2.0",
+    "langgraph>=1.0.0",
+    "langchain-openai>=0.3.0",
     "praisonai-tools>=0.1.0",
 ]
-all = ["praisonai-frameworks[crewai,autogen,langgraph]"]
+openai-agents = [
+    "openai-agents>=0.17.7,<0.18",
+    "praisonai-tools>=0.1.0",
+]
+all = ["praisonai-frameworks[crewai,autogen,langgraph,openai-agents]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.entry-points."praisonai.framework_adapters"]
@@ -52,6 +53,7 @@ autogen_v2 = "praisonai_frameworks.autogen.adapter_v2:AutoGenAdapter"
 autogen_v4 = "praisonai_frameworks.autogen.adapter_v4:AutoGenV4Adapter"
 ag2 = "praisonai_frameworks.autogen.adapter_ag2:AG2Adapter"
 langgraph = "praisonai_frameworks.langgraph.adapter:LangGraphAdapter"
+openai_agents = "praisonai_frameworks.openai_agents.adapter:OpenAIAgentsAdapter"
 
 [project.urls]
 Homepage = "https://praison.ai/docs"
@@ -65,3 +67,7 @@ packages = ["src/praisonai_frameworks"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: integration tests requiring optional deps",
+    "live: live LLM tests requiring OPENAI_API_KEY",
+]

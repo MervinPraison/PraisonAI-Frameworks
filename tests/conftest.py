@@ -16,7 +16,6 @@ roles:
     backstory: Expert researcher
     tasks:
       research:
-        agent: researcher
         description: Research {topic}
         expected_output: A concise summary
 """
@@ -41,7 +40,6 @@ def minimal_agents_config():
                 "backstory": "Expert researcher",
                 "tasks": {
                     "research": {
-                        "agent": "researcher",
                         "description": "Research {topic}",
                         "expected_output": "A concise summary",
                     }
@@ -55,6 +53,27 @@ def minimal_agents_config():
 def minimal_langgraph_config():
     return {
         "framework": "langgraph",
+        "topic": "Test topic",
+        "roles": {
+            "researcher": {
+                "role": "Research Analyst",
+                "goal": "Find accurate information",
+                "backstory": "Expert researcher",
+                "tasks": {
+                    "research": {
+                        "description": "Research {topic}",
+                        "expected_output": "A concise summary",
+                    }
+                },
+            }
+        },
+    }
+
+
+@pytest.fixture
+def minimal_openai_agents_config():
+    return {
+        "framework": "openai_agents",
         "topic": "Test topic",
         "roles": {
             "researcher": {

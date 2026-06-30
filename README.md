@@ -20,6 +20,9 @@ pip install praisonai-frameworks[autogen]
 # LangGraph backend
 pip install praisonai-frameworks[langgraph]
 
+# OpenAI Agents SDK backend
+pip install praisonai-frameworks[openai-agents]
+
 # AutoGen v0.4 backend (autogen-agentchat / autogen-ext)
 pip install praisonai-frameworks[autogen-v4]
 ```

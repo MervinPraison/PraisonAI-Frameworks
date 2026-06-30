@@ -1,0 +1,23 @@
+framework: openai_agents
+topic: language help
+roles:
+  triage:
+    role: Triage Agent
+    goal: Route to the right specialist
+    backstory: Detect language and delegate to the correct agent.
+    handoff:
+      to:
+        - English Agent
+        - French Agent
+    tasks:
+      route:
+        description: Help the user with {topic}. Reply in the user's language.
+        expected_output: A helpful reply in the correct language
+  english:
+    role: English Agent
+    goal: Reply in English only
+    backstory: English language specialist.
+  french:
+    role: French Agent
+    goal: Reply in French only
+    backstory: French language specialist.

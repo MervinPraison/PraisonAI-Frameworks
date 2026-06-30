@@ -1,0 +1,16 @@
+framework: openai_agents
+topic: text processing
+roles:
+  writer:
+    role: Writer
+    goal: Draft and polish text
+    backstory: You transform text precisely.
+    tasks:
+      draft:
+        description: Write the word hello
+        expected_output: hello
+      polish:
+        description: Convert the draft to uppercase
+        expected_output: HELLO
+        context:
+          - draft
