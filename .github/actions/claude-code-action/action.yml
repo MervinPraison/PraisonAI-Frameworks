@@ -218,30 +218,23 @@ runs:
         git config user.email "454862+MervinPraison@users.noreply.github.com"
 
         STEP 1 — READ GUIDELINES:
-        MANDATORY: Before writing any code, you MUST carefully read "src/praisonai-agents/AGENTS.md" to understand this repository's extremely specific Architecture, Protocol-First design rules, and Agent-Centric Philosophy.
+        MANDATORY: Before writing any code, read "AGENTS.md" at the repository root and "docs/adding-a-framework.md". This repo is PraisonAI-Frameworks (optional framework adapters only), not the core SDK.
 
-        STEP 2 — ARCHITECTURE VALIDATION & ROUTING (MANDATORY before writing code):
-        Before implementing anything, answer these questions:
-        - CORE vs WRAPPER vs TOOLS ROUTING:
-          1. Core SDK (praisonaiagents/): Only core protocols, base classes, decorators. No heavy implementations.
-          2. Wrapper (praisonai/): CLI, heavy implementations, optional dependencies.
-          3. Tools (PraisonAI-Tools): Specific integrations, external tools (e.g. SurrealDB, Slack), and community extensions MUST go to the `MervinPraison/PraisonAI-Tools` repository. If the feature is a tool, clone `https://github.com/MervinPraison/PraisonAI-Tools`, implement it there, and create the PR using `gh pr create -R MervinPraison/PraisonAI-Tools`.
-        - Does it duplicate existing functionality? Check if Agent already supports this via existing params (reflection, planning, tools, hooks, memory).
-        - Do not bloat the Agent class with additional params — only if absolutely required; we already support many params.
-        - Does it inherit from Agent properly? New agent types MUST inherit Agent, not wrap it with composition.
-        - Does it add new dependencies? Only optional deps allowed, must be lazy-imported.
-        - Will agent.py grow larger? If the change adds >50 lines to agent.py, find a way to extract instead. PRs with >100 lines added to agent.py require manual review (merge gate will not auto-merge).
-        - Is there a name collision with existing exports in __init__.py?
-        If ANY of these conceptual checks fail (excluding routing), add a comment to the issue explaining why and close it. Do NOT create a PR.
+        STEP 2 — ARCHITECTURE VALIDATION (MANDATORY before writing code):
+        - Adapters belong in src/praisonai_frameworks/<framework>/adapter.py only.
+        - Protocol changes belong in MervinPraison/PraisonAI (praisonaiagents), not here.
+        - CLI/registry/doctor changes belong in the praisonai wrapper, not here.
+        - Optional deps: declare in pyproject.toml extras; lazy-import inside run().
+        - Do not bloat base.py — keep shared helpers minimal.
+        - Integration test dirs must not shadow PyPI packages (e.g. use langgraph_adapter/, not langgraph/).
 
         STEP 3 — IMPLEMENT:
-        - Create a new git branch appropriately named (e.g. \`feature/issue-<number>\`)
-        - Follow protocol-driven design: protocols in core SDK, heavy implementations in wrapper
-        - Keep changes small and backward-compatible
+        - Create a new git branch appropriately named (e.g. \`claude/issue-<number>-<date>\`)
+        - Follow AGENTS.md adapter contract and CrewAI adapter as reference
 
         STEP 4 — TEST:
-        - Run: cd src/praisonai-agents && PYTHONPATH=. python -m pytest tests/ -x -q --timeout=30
-        - Ensure no regressions
+        - Run: pip install -e praisonai-package/src/praisonai-agents -e ".[dev]" && pytest tests/unit -q
+        - If you changed an optional extra, also: pip install -e ".[<extra>]" && pytest tests/integration/<extra>_adapter -q
 
         STEP 5 — CREATE PR:
         - Commit with descriptive message, push the branch
