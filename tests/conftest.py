@@ -16,6 +16,7 @@ roles:
     backstory: Expert researcher
     tasks:
       research:
+        agent: researcher
         description: Research {topic}
         expected_output: A concise summary
 """
@@ -40,6 +41,7 @@ def minimal_agents_config():
                 "backstory": "Expert researcher",
                 "tasks": {
                     "research": {
+                        "agent": "researcher",
                         "description": "Research {topic}",
                         "expected_output": "A concise summary",
                     }

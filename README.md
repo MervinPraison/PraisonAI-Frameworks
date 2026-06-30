@@ -31,6 +31,7 @@ roles:
     backstory: Expert researcher
     tasks:
       research:
+        agent: researcher
         description: Research {topic}
         expected_output: A concise summary
 ```
