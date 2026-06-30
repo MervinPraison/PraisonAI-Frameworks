@@ -134,3 +134,35 @@ def test_google_adk_live_sequential_llm_config_key_only(monkeypatch):
     result = adapter.run(config, llm_config, "numbers")
     assert "### Google ADK Output ###" in result
     assert "6" in result
+
+
+@pytest.mark.live
+@pytest.mark.skipif(not os.getenv("PRAISONAI_LIVE_TESTS"), reason="Set PRAISONAI_LIVE_TESTS=1")
+@pytest.mark.skipif(not _google_key(), reason="GOOGLE_API_KEY or GEMINI_API_KEY not set")
+def test_google_adk_live_handoff_gemini():
+    adapter = GoogleAdkAdapter()
+    config = {
+        "roles": {
+            "triage": {
+                "role": "Triage Agent",
+                "goal": "Route to English for English requests",
+                "backstory": "You delegate English questions to the English Agent.",
+                "handoff": {"to": ["English Agent"]},
+                "tasks": {
+                    "route": {
+                        "description": "The user says: Hello, how are you? Route appropriately.",
+                        "expected_output": "A friendly English reply",
+                    }
+                },
+            },
+            "english": {
+                "role": "English Agent",
+                "goal": "Reply in English only",
+                "backstory": "English specialist.",
+            },
+        }
+    }
+    llm_config = [{"model": "gemini-2.5-flash", "api_key": _google_key()}]
+    result = adapter.run(config, llm_config, "greeting", tools_dict={})
+    assert "### Google ADK Output ###" in result
+    assert len(result.strip()) > len("### Google ADK Output ###")

@@ -44,18 +44,29 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         try:
             self._ensure_adk()
             self._require_api_key(llm_config)
-            self._warn_allow_delegation_without_handoffs(config, topic)
             task_specs = self._collect_ordered_tasks(config, topic)
             if not task_specs:
                 return "### Google ADK Output ###\nNo tasks defined."
 
+            agents_by_key: Dict[str, Any] = {}
+            agents_by_role: Dict[str, Any] = {}
             if self._has_handoffs(config):
-                logger.warning(
-                    "Google ADK adapter does not support handoff.to yet; "
-                    "running collected tasks without handoff wiring."
+                agents_by_key, agents_by_role = self._build_agent_registry(
+                    config, llm_config, tools_dict, topic
                 )
+            else:
+                self._warn_allow_delegation_without_handoffs(config, topic)
 
-            if len(task_specs) == 1:
+            if self._has_handoffs(config) and len(task_specs) == 1:
+                answer = self._run_with_handoffs(
+                    task_specs,
+                    agents_by_key,
+                    agents_by_role,
+                    llm_config,
+                    tools_dict,
+                    topic,
+                )
+            elif len(task_specs) == 1:
                 answer = self._run_single_task(
                     task_specs[0], llm_config, tools_dict, topic
                 )
@@ -175,6 +186,19 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         safe = safe[:max_base].rstrip("_") or "agent"
         return f"{safe}_{suffix}"
 
+    def _stable_handoff_name(
+        self, details: Dict[str, Any], role_key: str, topic: str
+    ) -> str:
+        raw = self._role_field(details, role_key, topic)
+        safe = re.sub(r"[^a-zA-Z0-9_]", "_", str(raw).strip()).strip("_")
+        if safe and safe[0].isdigit():
+            safe = f"agent_{safe}"
+        if not safe or not safe.isidentifier() or safe == "user":
+            safe = re.sub(r"[^a-zA-Z0-9_]", "_", role_key).strip("_") or "agent"
+            if safe[0].isdigit():
+                safe = f"agent_{safe}"
+        return (safe[:63] or "agent").rstrip("_")
+
     def _system_prompt(self, details: Dict[str, Any], topic: str) -> str:
         role = self._format_template(details.get("role", ""), topic=topic)
         goal = self._format_template(details.get("goal", ""), topic=topic)
@@ -261,6 +285,8 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         tools_dict: Optional[Dict[str, Any]],
         topic: str,
         tool_names: Optional[List[Any]] = None,
+        *,
+        stable_name: bool = False,
     ):
         self._require_api_key(llm_config)
         from google.adk import Agent
@@ -273,7 +299,10 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             tool_names if tool_names is not None else details.get("tools"),
             tools_dict,
         )
-        agent_name = self._sanitize_agent_name(f"{role_key}_{task_name}", role_key)
+        if stable_name:
+            agent_name = self._stable_handoff_name(details, role_key, topic)
+        else:
+            agent_name = self._sanitize_agent_name(f"{role_key}_{task_name}", role_key)
         return Agent(
             name=agent_name,
             model=model,
@@ -359,16 +388,25 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         llm_config: Optional[List[Dict]],
         tools_dict: Optional[Dict[str, Any]],
         topic: str,
+        agents_by_key: Optional[Dict[str, Any]] = None,
     ):
-        return self._build_adk_agent(
-            spec["role_key"],
+        role_key = spec["role_key"]
+        stable = agents_by_key is not None
+        agent = self._build_adk_agent(
+            role_key,
             spec["name"],
             spec["role_details"],
             llm_config,
             tools_dict,
             topic,
             tool_names=spec["tools"],
+            stable_name=stable,
         )
+        if agents_by_key:
+            base = agents_by_key.get(role_key)
+            if base and getattr(base, "sub_agents", None):
+                agent.sub_agents = list(base.sub_agents)
+        return agent
 
     def _collect_ordered_tasks(
         self, config: Dict[str, Any], topic: str
@@ -479,6 +517,69 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
                     "Google ADK requires explicit handoff targets or sub-agent wiring.",
                     role_name,
                 )
+
+    def _build_agent_registry(
+        self,
+        config: Dict[str, Any],
+        llm_config: Optional[List[Dict]],
+        tools_dict: Optional[Dict[str, Any]],
+        topic: str,
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        self._warn_allow_delegation_without_handoffs(config, topic)
+        by_key: Dict[str, Any] = {}
+        by_role: Dict[str, Any] = {}
+
+        for role_key, details in config.get("roles", {}).items():
+            agent = self._build_adk_agent(
+                role_key,
+                "handoff",
+                details,
+                llm_config,
+                tools_dict,
+                topic,
+                stable_name=True,
+            )
+            by_key[role_key] = agent
+            by_role[self._role_field(details, role_key, topic)] = agent
+
+        for role_key, details in config.get("roles", {}).items():
+            targets = self._handoff_targets(details)
+            if not targets:
+                continue
+            agent = by_key[role_key]
+            sub_agents = []
+            for target in targets:
+                target_agent = by_role.get(target) or by_key.get(target)
+                if target_agent is None:
+                    available = sorted(set(by_role) | set(by_key))
+                    raise ValueError(
+                        f"Handoff target '{target}' not found. "
+                        f"Available roles: {', '.join(available)}"
+                    )
+                sub_agents.append(target_agent)
+            agent.sub_agents = sub_agents
+
+        return by_key, by_role
+
+    def _run_with_handoffs(
+        self,
+        task_specs: List[Dict[str, Any]],
+        agents_by_key: Dict[str, Any],
+        _agents_by_role: Dict[str, Any],
+        llm_config: Optional[List[Dict]],
+        tools_dict: Optional[Dict[str, Any]],
+        topic: str,
+    ) -> str:
+        first_spec = task_specs[0]
+        agent = self._agent_for_task(
+            first_spec,
+            llm_config,
+            tools_dict,
+            topic,
+            agents_by_key=agents_by_key,
+        )
+        message = self._task_message(first_spec, {})
+        return self._invoke_agent(agent, message, llm_config)
 
     def _run_single_task(
         self,

@@ -28,6 +28,7 @@ def test_google_adk_adapter_build_agent_fields(minimal_google_adk_config, mock_l
         {},
         minimal_google_adk_config["topic"],
     )
-    assert agent.name == "researcher_research"
+    assert agent.name.startswith("researcher_research_")
+    assert agent.name.isidentifier()
     assert "Research Analyst" in agent.instruction
     assert agent.mode == "chat"

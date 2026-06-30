@@ -40,18 +40,29 @@ class AgnoAdapter(BaseFrameworkAdapter):
         try:
             self._ensure_agno()
             self._require_api_key(llm_config)
-            self._warn_allow_delegation_without_handoffs(config, topic)
             task_specs = self._collect_ordered_tasks(config, topic)
             if not task_specs:
                 return "### Agno Output ###\nNo tasks defined."
 
+            agents_by_key: Dict[str, Any] = {}
+            agents_by_role: Dict[str, Any] = {}
             if self._has_handoffs(config):
-                logger.warning(
-                    "Agno adapter does not support handoff.to yet; "
-                    "running collected tasks without handoff wiring."
+                agents_by_key, agents_by_role = self._build_agent_registry(
+                    config, llm_config, tools_dict, topic
                 )
+            else:
+                self._warn_allow_delegation_without_handoffs(config, topic)
 
-            if len(task_specs) == 1:
+            if self._has_handoffs(config) and len(task_specs) == 1:
+                answer = self._run_with_handoffs(
+                    task_specs,
+                    agents_by_key,
+                    agents_by_role,
+                    llm_config,
+                    tools_dict,
+                    topic,
+                )
+            elif len(task_specs) == 1:
                 answer = self._run_single_task(
                     task_specs[0], llm_config, tools_dict, topic
                 )
@@ -213,8 +224,19 @@ class AgnoAdapter(BaseFrameworkAdapter):
         except Exception as exc:
             raise RuntimeError(f"Agno agent invocation failed: {exc}") from exc
 
+        return self._extract_run_content(result, "Agno agent")
+
+    def _invoke_team(self, team, message: str) -> str:
+        try:
+            result = team.run(input=message, stream=False)
+        except Exception as exc:
+            raise RuntimeError(f"Agno team invocation failed: {exc}") from exc
+
+        return self._extract_run_content(result, "Agno team")
+
+    def _extract_run_content(self, result, label: str) -> str:
         if result is None:
-            raise RuntimeError("Agno agent returned no result")
+            raise RuntimeError(f"{label} returned no result")
 
         content = result.get_content_as_string() if hasattr(result, "get_content_as_string") else ""
         if not content or content == "null":
@@ -229,7 +251,7 @@ class AgnoAdapter(BaseFrameworkAdapter):
                         content = str(text).strip()
                         break
         if not content:
-            raise RuntimeError("Agno agent returned empty content")
+            raise RuntimeError(f"{label} returned empty content")
         return str(content).strip()
 
     def _agent_for_task(
@@ -351,6 +373,80 @@ class AgnoAdapter(BaseFrameworkAdapter):
                     "Agno requires explicit handoff targets or Team wiring.",
                     role_name,
                 )
+
+    def _build_agent_registry(
+        self,
+        config: Dict[str, Any],
+        llm_config: Optional[List[Dict]],
+        tools_dict: Optional[Dict[str, Any]],
+        topic: str,
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        self._warn_allow_delegation_without_handoffs(config, topic)
+        by_key: Dict[str, Any] = {}
+        by_role: Dict[str, Any] = {}
+
+        for role_key, details in config.get("roles", {}).items():
+            agent = self._build_agent(
+                role_key, details, llm_config, tools_dict, topic
+            )
+            by_key[role_key] = agent
+            by_role[self._role_field(details, role_key, topic)] = agent
+
+        for role_key, details in config.get("roles", {}).items():
+            targets = self._handoff_targets(details)
+            if not targets:
+                continue
+            for target in targets:
+                if target not in by_role and target not in by_key:
+                    available = sorted(set(by_role) | set(by_key))
+                    raise ValueError(
+                        f"Handoff target '{target}' not found. "
+                        f"Available roles: {', '.join(available)}"
+                    )
+
+        return by_key, by_role
+
+    def _run_with_handoffs(
+        self,
+        task_specs: List[Dict[str, Any]],
+        agents_by_key: Dict[str, Any],
+        agents_by_role: Dict[str, Any],
+        llm_config: Optional[List[Dict]],
+        tools_dict: Optional[Dict[str, Any]],
+        topic: str,
+    ) -> str:
+        from agno.team.team import Team
+
+        first_spec = task_specs[0]
+        router = self._build_agent(
+            first_spec["role_key"],
+            first_spec["role_details"],
+            llm_config,
+            tools_dict,
+            topic,
+            tool_names=first_spec["tools"],
+            expected_output=first_spec.get("expected_output", ""),
+        )
+        targets = self._handoff_targets(first_spec["role_details"])
+        members = [router]
+        for target in targets:
+            specialist = agents_by_role.get(target) or agents_by_key.get(target)
+            if specialist is None:
+                available = sorted(set(agents_by_role) | set(agents_by_key))
+                raise ValueError(
+                    f"Handoff target '{target}' not found. "
+                    f"Available roles: {', '.join(available)}"
+                )
+            members.append(specialist)
+
+        team = Team(
+            members=members,
+            mode="route",
+            name=f"{first_spec['role_key']}_team",
+            model=router.model,
+        )
+        message = self._task_message(first_spec, {})
+        return self._invoke_team(team, message)
 
     def _run_single_task(
         self,

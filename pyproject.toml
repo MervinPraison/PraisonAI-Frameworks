@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "praisonai-frameworks"
-version = "0.1.7"
+version = "0.1.8"
 description = "Optional agent framework adapters for PraisonAI (CrewAI, AutoGen, extensions)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -51,7 +51,7 @@ google-adk = [
     "google-adk[extensions]>=2.3.0,<2.4",
     "praisonai-tools>=0.1.0",
 ]
-all = ["praisonai-frameworks[crewai,autogen,langgraph,openai-agents,agno,google-adk]"]
+all = ["praisonai-frameworks[crewai,autogen,langgraph,openai-agents,agno]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.entry-points."praisonai.framework_adapters"]
@@ -73,6 +73,22 @@ Issues = "https://github.com/MervinPraison/PraisonAI-Frameworks/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/praisonai_frameworks"]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "langgraph" },
+        { extra = "google-adk" },
+    ],
+    [
+        { extra = "openai-agents" },
+        { extra = "google-adk" },
+    ],
+    [
+        { extra = "all" },
+        { extra = "google-adk" },
+    ],
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
