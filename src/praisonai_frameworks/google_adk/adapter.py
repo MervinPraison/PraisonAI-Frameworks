@@ -42,6 +42,7 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         _ = (agent_callback, cli_config)
         try:
             self._ensure_adk()
+            self._require_api_key(llm_config)
             self._warn_allow_delegation_without_handoffs(config, topic)
             task_specs = self._collect_ordered_tasks(config, topic)
             if not task_specs:
@@ -81,12 +82,17 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             ) from exc
 
     def _resolve_model_name(self, spec: Any, llm_config: Optional[List[Dict]]) -> str:
+        from praisonaiagents.frameworks.base import BaseFrameworkAdapter as CoreBase
+
+        has_role_spec = (isinstance(spec, str) and spec.strip()) or (
+            isinstance(spec, dict) and spec.get("model")
+        )
+        if has_role_spec:
+            return CoreBase._resolve_llm(self, spec, llm_config)
         if llm_config:
             explicit = llm_config[0].get("model")
             if isinstance(explicit, str) and explicit.strip():
                 return explicit.strip()
-        from praisonaiagents.frameworks.base import BaseFrameworkAdapter as CoreBase
-
         return CoreBase._resolve_llm(self, spec, llm_config)
 
     def _uses_gemini(self, model: str, llm_config: Optional[List[Dict]]) -> bool:
@@ -156,6 +162,7 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         return LiteLlm(**kwargs)
 
     def _sanitize_agent_name(self, name: str, fallback: str = "agent") -> str:
+        suffix = uuid.uuid5(uuid.NAMESPACE_DNS, str(name)).hex[:8]
         safe = re.sub(r"[^a-zA-Z0-9_]", "_", str(name).strip()).strip("_")
         if safe and safe[0].isdigit():
             safe = f"agent_{safe}"
@@ -163,7 +170,9 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             safe = re.sub(r"[^a-zA-Z0-9_]", "_", fallback).strip("_") or "agent"
             if safe[0].isdigit():
                 safe = f"agent_{safe}"
-        return safe
+        max_base = max(1, 63 - len(suffix) - 1)
+        safe = safe[:max_base].rstrip("_") or "agent"
+        return f"{safe}_{suffix}"
 
     def _system_prompt(self, details: Dict[str, Any], topic: str) -> str:
         role = self._format_template(details.get("role", ""), topic=topic)
@@ -184,9 +193,13 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
                 return None
             name = getattr(tool, "name", fallback_name)
             desc = getattr(tool, "description", name) or name
-            inner.__name__ = name
-            inner.__doc__ = desc
-            return FunctionTool(inner)
+
+            def _wrapped(**kwargs):
+                return inner(**kwargs)
+
+            _wrapped.__name__ = name
+            _wrapped.__doc__ = desc
+            return FunctionTool(_wrapped)
 
         if hasattr(tool, "run") and callable(tool.run):
             name = getattr(tool, "name", fallback_name)
@@ -207,11 +220,14 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
                 )
                 return None
             name = getattr(tool, "__name__", fallback_name)
-            if not getattr(tool, "__doc__", None):
-                tool.__doc__ = name
-            if getattr(tool, "__name__", "") != name:
-                tool.__name__ = name
-            return FunctionTool(tool)
+            desc = getattr(tool, "__doc__", None) or name
+
+            def _wrapped(*args, **kwargs):
+                return tool(*args, **kwargs)
+
+            _wrapped.__name__ = name
+            _wrapped.__doc__ = desc
+            return FunctionTool(_wrapped)
 
         return None
 
@@ -352,6 +368,13 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
                     raise ValueError(
                         f"Task '{task_name}' in role '{role_key}' requires 'description'"
                     )
+                if task_name in tasks_dict:
+                    logger.warning(
+                        "Duplicate task name '%s' in role '%s'; "
+                        "earlier definition will be overwritten.",
+                        task_name,
+                        role_key,
+                    )
                 tasks_dict[task_name] = {
                     "name": task_name,
                     "role_key": role_key,
@@ -465,6 +488,6 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         for spec in task_specs:
             message = self._task_message(spec, context_outputs)
             agent = self._agent_for_task(spec, llm_config, tools_dict, topic)
-            answer = self._invoke_agent(agent, message)
+            answer = self._invoke_agent(agent, message, llm_config)
             context_outputs[spec["name"]] = answer
         return answer

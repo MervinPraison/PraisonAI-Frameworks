@@ -211,3 +211,118 @@ def test_google_adk_handoff_warning(caplog):
             "topic",
         )
     assert any("handoff.to" in r.message for r in caplog.records)
+
+
+def test_google_adk_run_sequential_passes_llm_config():
+    adapter = GoogleAdkAdapter()
+    specs = [
+        {
+            "name": "draft",
+            "role_key": "writer",
+            "role_details": {},
+            "description": "Draft",
+            "expected_output": "",
+            "context": [],
+            "tools": [],
+        },
+        {
+            "name": "polish",
+            "role_key": "writer",
+            "role_details": {},
+            "description": "Polish",
+            "expected_output": "",
+            "context": ["draft"],
+            "tools": [],
+        },
+    ]
+    llm_config = [{"model": "gemini-2.5-flash", "api_key": "config-only-key"}]
+    mock_agent = MagicMock()
+    with patch.object(adapter, "_agent_for_task", return_value=mock_agent), patch.object(
+        adapter, "_invoke_agent", side_effect=["draft out", "polish out"]
+    ) as mock_invoke:
+        result = adapter._run_sequential(specs, llm_config, {}, "topic")
+
+    assert result == "polish out"
+    assert mock_invoke.call_count == 2
+    for call in mock_invoke.call_args_list:
+        assert call.args[2] == llm_config
+
+
+def test_google_adk_resolve_model_name_role_overrides_global():
+    adapter = GoogleAdkAdapter()
+    llm_config = [{"model": "gemini-2.5-flash", "api_key": "k"}]
+    assert adapter._resolve_model_name({"model": "gpt-4o-mini"}, llm_config) == "gpt-4o-mini"
+
+
+def test_google_adk_resolve_model_name_falls_back_to_llm_config():
+    adapter = GoogleAdkAdapter()
+    llm_config = [{"model": "gemini-2.5-flash", "api_key": "k"}]
+    assert adapter._resolve_model_name(None, llm_config) == "gemini-2.5-flash"
+
+
+def test_google_adk_resolve_adk_model_maps_base_url_to_api_base():
+    adapter = GoogleAdkAdapter()
+    mock_lite = MagicMock()
+    with patch.object(adapter, "_require_api_key", return_value="test-key"), patch.object(
+        adapter, "_uses_gemini", return_value=False
+    ), patch.dict(
+        "sys.modules",
+        {"google.adk.models.lite_llm": MagicMock(LiteLlm=mock_lite)},
+    ):
+        adapter._resolve_adk_model(
+            None,
+            [{"model": "gpt-4o-mini", "api_key": "test-key", "base_url": "https://proxy.example/v1"}],
+        )
+    assert mock_lite.call_args.kwargs["api_base"] == "https://proxy.example/v1"
+
+
+def test_google_adk_duplicate_task_name_warning(caplog):
+    adapter = GoogleAdkAdapter()
+    config = {
+        "roles": {
+            "writer": {
+                "role": "Writer",
+                "goal": "Write",
+                "backstory": "Writer",
+                "tasks": {
+                    "draft": {"description": "First draft"},
+                },
+            },
+            "editor": {
+                "role": "Editor",
+                "goal": "Edit",
+                "backstory": "Editor",
+                "tasks": {
+                    "draft": {"description": "Second draft"},
+                },
+            },
+        }
+    }
+    ordered = adapter._collect_ordered_tasks(config, "topic")
+    assert len(ordered) == 1
+    assert ordered[0]["description"] == "Second draft"
+    assert any("Duplicate task name" in r.message for r in caplog.records)
+
+
+def test_google_adk_to_adk_tool_does_not_mutate_shared_callable():
+    adapter = GoogleAdkAdapter()
+    original_name = "shared_tool"
+    original_doc = "Shared doc"
+
+    def shared_tool(query: str) -> str:
+        """Shared doc"""
+        return query
+
+    shared_tool.__name__ = original_name
+    shared_tool.__doc__ = original_doc
+
+    with patch.dict(
+        "sys.modules",
+        {"google.adk.tools.function_tool": MagicMock(FunctionTool=lambda fn: fn)},
+    ):
+        wrapped = adapter._to_adk_tool(shared_tool, "fallback")
+
+    assert shared_tool.__name__ == original_name
+    assert shared_tool.__doc__ == original_doc
+    assert wrapped is not None
+    assert wrapped.__name__ == original_name
