@@ -245,9 +245,9 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
         topic: str,
         tool_names: Optional[List[Any]] = None,
     ):
+        self._require_api_key(llm_config)
         from google.adk import Agent
 
-        self._require_api_key(llm_config)
         role = self._format_template(details.get("role", role_key), topic=topic)
         goal = self._format_template(details.get("goal", ""), topic=topic)
         instruction = self._system_prompt(details, topic)
