@@ -4,7 +4,6 @@
  */
 
 const mergeGate = require('./merge-gate.js');
-const chain = require('./bot-pr-review-chain.js');
 
 const PIPELINE_PREFIX = 'pipeline/';
 const STAGE_LABELS = [
@@ -25,7 +24,7 @@ const BLOCKER_LABELS = [
 const ALL_PIPELINE_LABELS = [...STAGE_LABELS, ...BLOCKER_LABELS];
 
 const LABEL_SPECS = [
-  { name: 'pipeline/reviews-pending', color: 'fbca04', description: 'Waiting for CodeRabbit/Qodo/Copilot reviews' },
+  { name: 'pipeline/reviews-pending', color: 'fbca04', description: 'Legacy: external reviews (unused)' },
   { name: 'pipeline/final-claude-pending', color: 'd4c5f9', description: 'Reviews done; waiting for FINAL @claude' },
   { name: 'pipeline/awaiting-merge-gate', color: 'c5def5', description: 'FINAL done; waiting for merge gate / CI' },
   { name: 'pipeline/merge-ready', color: '0e8a16', description: 'Eligible for merge gate auto-merge' },
@@ -40,7 +39,6 @@ const LABEL_SPECS = [
 
 function deriveStage(comments, evalResult) {
   if (evalResult.ready) return 'pipeline/merge-ready';
-  if (!chain.chainKickPosted(comments)) return 'pipeline/reviews-pending';
   if (!mergeGate.hasFinalClaudeReviewTrigger(comments)) return 'pipeline/final-claude-pending';
   return 'pipeline/awaiting-merge-gate';
 }
