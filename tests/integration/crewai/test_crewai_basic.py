@@ -6,8 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytest.importorskip("praisonaiagents.frameworks")
-pytest.importorskip("crewai")
+crewai = pytest.importorskip("crewai")
 
 from praisonai_frameworks.crewai.adapter import CrewAIAdapter
 

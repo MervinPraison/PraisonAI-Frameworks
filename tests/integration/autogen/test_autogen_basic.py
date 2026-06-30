@@ -6,8 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytest.importorskip("praisonaiagents.frameworks")
-pytest.importorskip("autogen")
+autogen = pytest.importorskip("autogen")
 
 from praisonai_frameworks.autogen.adapter_v2 import AutoGenAdapter
 from praisonai_frameworks.autogen.family import AutoGenFamilyAdapter
