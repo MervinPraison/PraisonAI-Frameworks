@@ -57,9 +57,12 @@ class LangGraphAdapter(BaseFrameworkAdapter):
             finalize_observability(self.name, status=status)
 
     def _resolve_model_name(self, spec: Any, llm_config: Optional[List[Dict]]) -> str:
+        return self._normalise_model_name(self._resolve_raw_model_name(spec, llm_config))
+
+    def _resolve_raw_model_name(self, spec: Any, llm_config: Optional[List[Dict]]) -> str:
         from praisonaiagents.frameworks.base import BaseFrameworkAdapter as CoreBase
 
-        return self._normalise_model_name(CoreBase._resolve_llm(self, spec, llm_config))
+        return CoreBase._resolve_llm(self, spec, llm_config)
 
     def _resolve_chat_model(self, spec: Any, llm_config: Optional[List[Dict]]):
         first_config = (
@@ -69,9 +72,20 @@ class LangGraphAdapter(BaseFrameworkAdapter):
         )
         base = first_config.get("base_url")
         key = first_config.get("api_key") or os.environ.get("OPENAI_API_KEY")
-        model = self._resolve_model_name(spec, llm_config)
 
-        kwargs: Dict[str, Any] = {}
+        raw_model = self._resolve_raw_model_name(spec, llm_config)
+        provider = raw_model.split("/", 1)[0] if "/" in raw_model else None
+        model = self._normalise_model_name(raw_model)
+
+        non_openai = provider is not None and provider not in ("openai", "azure")
+        if non_openai and not base:
+            init_chat_model = self._load_init_chat_model()
+            if init_chat_model is not None:
+                return init_chat_model(model, model_provider=provider)
+
+        from langchain_openai import ChatOpenAI
+
+        kwargs: Dict[str, Any] = {"model": model}
         if key:
             kwargs["api_key"] = key
         if base:
@@ -80,15 +94,21 @@ class LangGraphAdapter(BaseFrameworkAdapter):
             raise ValueError(
                 "LangGraph requires an API key. Set OPENAI_API_KEY or pass api_key in llm_config."
             )
+        return ChatOpenAI(**kwargs)
 
-        try:
-            from langchain.chat_models import init_chat_model
+    def _load_init_chat_model(self):
+        """Return LangChain's init_chat_model if available, else None."""
+        for module_name in ("langchain.chat_models", "langchain_core.language_models"):
+            try:
+                import importlib
 
-            return init_chat_model(model, **kwargs)
-        except Exception:
-            from langchain_openai import ChatOpenAI
-
-            return ChatOpenAI(model=model, **kwargs)
+                module = importlib.import_module(module_name)
+            except ImportError:
+                continue
+            init_chat_model = getattr(module, "init_chat_model", None)
+            if init_chat_model is not None:
+                return init_chat_model
+        return None
 
     def _extract_message_content(self, message: Any) -> str:
         content = getattr(message, "content", message)
