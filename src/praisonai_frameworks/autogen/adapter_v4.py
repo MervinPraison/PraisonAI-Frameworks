@@ -25,7 +25,7 @@ class AutoGenV4Adapter(BaseFrameworkAdapter):
     def _build_model_client(self, llm_config: List[Dict]):
         from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-        entry = llm_config[0] if llm_config else {}
+        entry = llm_config[0] if (llm_config and isinstance(llm_config[0], dict)) else {}
         model = entry.get("model") or os.environ.get("MODEL_NAME") or self.DEFAULT_MODEL
         kwargs: Dict[str, Any] = {"model": model}
         if entry.get("api_key"):
@@ -49,7 +49,10 @@ class AutoGenV4Adapter(BaseFrameworkAdapter):
         agents = []
         task_messages: List[str] = []
 
-        for role, details in config.get("roles", {}).items():
+        roles = (config or {}).get("roles", {}) or {}
+        for role, details in roles.items():
+            if not isinstance(details, dict):
+                continue
             agent_name = self._sanitize_name(
                 self._format_template(details.get("role", role), topic=topic)
             )
@@ -65,10 +68,24 @@ class AutoGenV4Adapter(BaseFrameworkAdapter):
                 )
             )
 
-            for _task_name, task_details in details.get("tasks", {}).items():
-                task_messages.append(
-                    self._format_template(task_details["description"], topic=topic)
-                )
+            tasks = details.get("tasks", {})
+            if isinstance(tasks, dict):
+                task_items = list(tasks.values())
+            elif isinstance(tasks, list):
+                task_items = tasks
+            else:
+                task_items = []
+            for task_details in task_items:
+                if isinstance(task_details, dict):
+                    description = task_details.get("description", "")
+                elif isinstance(task_details, str):
+                    description = task_details
+                else:
+                    description = ""
+                if description:
+                    task_messages.append(
+                        self._format_template(description, topic=topic)
+                    )
 
         if not agents:
             raise ValueError("AutoGen v0.4 adapter requires at least one role in config.")
