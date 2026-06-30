@@ -116,14 +116,16 @@ See also: [docs/adding-a-framework.md](docs/adding-a-framework.md), [examples/th
 
 ## 5. Registered frameworks
 
-| Entry point | Extra | Adapter module |
-|-------------|-------|----------------|
-| `crewai` | `[crewai]` | `crewai.adapter:CrewAIAdapter` |
-| `autogen` | `[autogen]` | `autogen.family:AutoGenFamilyAdapter` (router) |
-| `autogen_v2` | `[autogen]` | `autogen.adapter_v2:AutoGenAdapter` |
-| `autogen_v4` | `[autogen-v4]` | stub / placeholder |
-| `ag2` | `[ag2]` | stub / placeholder |
-| `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` (when merged) |
+| Entry point | Extra | Adapter module | Status |
+|-------------|-------|----------------|--------|
+| `crewai` | `[crewai]` | `crewai.adapter:CrewAIAdapter` | Registered |
+| `autogen` | `[autogen]` | `autogen.family:AutoGenFamilyAdapter` (router) | Registered |
+| `autogen_v2` | `[autogen]` | `autogen.adapter_v2:AutoGenAdapter` | Registered |
+| `autogen_v4` | `[autogen-v4]` | stub / placeholder | **Planned** — extra exists, entry point not yet registered |
+| `ag2` | `[ag2]` | stub / placeholder | **Planned** — extra exists, entry point not yet registered |
+| `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` | **Planned** — register on merge |
+
+Only rows marked *Registered* currently appear under `[project.entry-points."praisonai.framework_adapters"]` in `pyproject.toml`. *Planned* rows are documented intent; add the entry point (and extra, if missing) when the adapter lands.
 
 Family routers implement `resolve()` to pick a concrete adapter from config/version.
 
@@ -132,14 +134,20 @@ Family routers implement `resolve()` to pick a concrete adapter from config/vers
 ## 6. Testing standards
 
 ```bash
-# Base (no optional frameworks)
-pip install -e praisonai-package/src/praisonai-agents -e ".[dev]"
+# Base — local development (installs praisonaiagents from PyPI)
+pip install -e ".[dev]"
 pytest tests/unit -q
+
+# Base — CI multi-repo checkout (uses local editable praisonaiagents when present)
+[ -d praisonai-package ] && pip install -e praisonai-package/src/praisonai-agents
+pip install -e ".[dev]" && pytest tests/unit -q
 
 # Per-framework
 pip install -e ".[langgraph]"
 pytest tests/integration/langgraph_adapter -q
 ```
+
+> The `praisonai-package/` directory only exists in the CI multi-repo checkout. For local development, `pip install -e ".[dev]"` pulls `praisonaiagents` from PyPI — no extra checkout required.
 
 | Layer | Location | Gate |
 |-------|----------|------|
@@ -148,7 +156,7 @@ pytest tests/integration/langgraph_adapter -q
 | Integration | `tests/integration/<name>_adapter/` | `pytest.importorskip("<pkg>")` |
 | Live API | `test_*_live.py` | `OPENAI_API_KEY`; optional `PRAISONAI_LIVE_TESTS` |
 
-**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph"]` — unit tests run on **every** row; do not require `langchain_core` on the crewai/autogen rows.
+**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph"]` — unit tests run on **every** row, including the base row (`extra: ""`). Therefore unit tests must **not** require any optional dependency (e.g. `langchain_core`, `crewai`); use `pytest.importorskip` or patch helpers so they pass on the base row where no extra is installed.
 
 ---
 
