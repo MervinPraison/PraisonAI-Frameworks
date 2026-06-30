@@ -34,13 +34,24 @@ autogen-v4 = [
     "praisonai-tools>=0.1.0",
     "crewai",
 ]
-all = ["praisonai-frameworks[crewai,autogen]"]
+langgraph = [
+    "langgraph>=0.2.0,<2",
+    "langgraph-prebuilt>=0.2.0,<2",
+    "langchain>=0.3.0,<2",
+    "langchain-core>=0.3.0,<2",
+    "langchain-openai>=0.2.0",
+    "praisonai-tools>=0.1.0",
+]
+all = ["praisonai-frameworks[crewai,autogen,langgraph]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.entry-points."praisonai.framework_adapters"]
 crewai = "praisonai_frameworks.crewai.adapter:CrewAIAdapter"
 autogen = "praisonai_frameworks.autogen.family:AutoGenFamilyAdapter"
 autogen_v2 = "praisonai_frameworks.autogen.adapter_v2:AutoGenAdapter"
+autogen_v4 = "praisonai_frameworks.autogen.adapter_v4:AutoGenV4Adapter"
+ag2 = "praisonai_frameworks.autogen.adapter_ag2:AG2Adapter"
+langgraph = "praisonai_frameworks.langgraph.adapter:LangGraphAdapter"
 
 [project.urls]
 Homepage = "https://praison.ai/docs"

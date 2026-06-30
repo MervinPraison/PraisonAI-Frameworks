@@ -1,0 +1,11 @@
+framework: langgraph
+topic: Example research task
+roles:
+  researcher:
+    role: Research Analyst
+    goal: Gather accurate information on {topic}
+    backstory: Expert researcher
+    tasks:
+      research:
+        description: Research {topic}
+        expected_output: A short summary
