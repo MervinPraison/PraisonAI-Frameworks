@@ -50,6 +50,27 @@ def minimal_agents_config():
 
 
 @pytest.fixture
+def minimal_langgraph_config():
+    return {
+        "framework": "langgraph",
+        "topic": "Test topic",
+        "roles": {
+            "researcher": {
+                "role": "Research Analyst",
+                "goal": "Find accurate information",
+                "backstory": "Expert researcher",
+                "tasks": {
+                    "research": {
+                        "description": "Research {topic}",
+                        "expected_output": "A concise summary",
+                    }
+                },
+            }
+        },
+    }
+
+
+@pytest.fixture
 def mock_llm_config():
     return [{"model": "openai/gpt-4o-mini", "api_key": "test-key"}]
 

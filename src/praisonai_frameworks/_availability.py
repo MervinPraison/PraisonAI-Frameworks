@@ -31,6 +31,10 @@ _PROBES: dict[str, Callable[[], bool]] = {
     "autogen": lambda: importlib.util.find_spec("autogen") is not None,
     "autogen_v4": _autogen_v4_probe,
     "ag2": _ag2_probe,
+    "langgraph": lambda: (
+        importlib.util.find_spec("langgraph") is not None
+        and importlib.util.find_spec("langgraph.prebuilt") is not None
+    ),
 }
 
 
