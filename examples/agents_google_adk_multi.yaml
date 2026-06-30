@@ -1,0 +1,16 @@
+framework: google_adk
+topic: numbers
+roles:
+  writer:
+    role: Writer
+    goal: Write numbers only
+    backstory: Concise writer
+    tasks:
+      draft:
+        description: Reply with only the number 3.
+        expected_output: "3"
+      polish:
+        description: Add 3 to the previous result. Reply with only the number.
+        expected_output: "6"
+        context:
+          - draft

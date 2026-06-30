@@ -26,6 +26,9 @@ pip install praisonai-frameworks[openai-agents]
 # Agno backend
 pip install praisonai-frameworks[agno]
 
+# Google ADK backend
+pip install praisonai-frameworks[google-adk]
+
 # AutoGen v0.4 backend (autogen-agentchat / autogen-ext)
 pip install praisonai-frameworks[autogen-v4]
 ```

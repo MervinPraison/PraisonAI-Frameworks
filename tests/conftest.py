@@ -113,6 +113,27 @@ def minimal_agno_config():
 
 
 @pytest.fixture
+def minimal_google_adk_config():
+    return {
+        "framework": "google_adk",
+        "topic": "Test topic",
+        "roles": {
+            "researcher": {
+                "role": "Research Analyst",
+                "goal": "Find accurate information",
+                "backstory": "Expert researcher",
+                "tasks": {
+                    "research": {
+                        "description": "Research {topic}",
+                        "expected_output": "A concise summary",
+                    }
+                },
+            }
+        },
+    }
+
+
+@pytest.fixture
 def mock_llm_config():
     return [{"model": "openai/gpt-4o-mini", "api_key": "test-key"}]
 

@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.12"]
-        extra: ["", "crewai", "autogen", "langgraph", "openai-agents", "agno"]
+        extra: ["", "crewai", "autogen", "langgraph", "openai-agents", "agno", "google-adk"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
       - name: Run integration tests
         if: matrix.extra != ''
         run: |
-          dir="tests/integration/${{ matrix.extra == 'langgraph' && 'langgraph_adapter' || matrix.extra == 'openai-agents' && 'openai_agents_adapter' || matrix.extra == 'agno' && 'agno_adapter' || matrix.extra }}"
+          dir="tests/integration/${{ matrix.extra == 'langgraph' && 'langgraph_adapter' || matrix.extra == 'openai-agents' && 'openai_agents_adapter' || matrix.extra == 'agno' && 'agno_adapter' || matrix.extra == 'google-adk' && 'google_adk_adapter' || matrix.extra }}"
           if [ ! -d "$dir" ]; then
             echo "No integration tests for ${{ matrix.extra }} yet — skipping"
             exit 0
