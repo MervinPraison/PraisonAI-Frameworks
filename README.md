@@ -16,7 +16,21 @@ pip install praisonai-frameworks[crewai]
 
 # AutoGen v0.2 backend
 pip install praisonai-frameworks[autogen]
+
+# AutoGen v0.4 backend (autogen-agentchat / autogen-ext)
+pip install praisonai-frameworks[autogen-v4]
 ```
+
+### Selecting an AutoGen version
+
+Use `framework: autogen` and set `AUTOGEN_VERSION` to choose a backend:
+
+| `AUTOGEN_VERSION` | Backend |
+|-------------------|---------|
+| `v0.2`            | AutoGen v0.2 (`autogen`) |
+| `v0.4`            | AutoGen v0.4 (`autogen-agentchat`) |
+| `ag2`             | AG2 fork |
+| `auto` (default)  | First available: v0.2 → v0.4 → ag2 |
 
 ## Usage
 

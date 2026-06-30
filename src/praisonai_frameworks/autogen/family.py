@@ -50,7 +50,6 @@ class AutoGenFamilyAdapter(BaseFrameworkAdapter):
         if v2_available:
             return "autogen_v2"
         if v4_available:
-            logger.warning("AutoGen v0.4 is installed but not yet implemented.")
             return "autogen_v4"
         if ag2_available:
             return "ag2"
