@@ -5,26 +5,126 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  issues:
+    types: [assigned, labeled, opened]
   pull_request_review:
     types: [submitted]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: read
-  id-token: write
-
 jobs:
-  claude-response:
-    env:
-      ISSUE_NUMBER_RESOLVED: ${{ github.event.issue.number }}
+  # ================================================================
+  # Job 1: Lightweight triage for ALL new issues (including external users)
+  # Posts welcome comment + adds triage labels. No Claude code execution.
+  # ================================================================
+  issue-triage:
     if: |
-      (
-        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
-      ) &&
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      !contains(toJSON(github.event.issue.labels), 'claude')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CLAUDE_APP_ID }}
+          private-key: ${{ secrets.CLAUDE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Triage and acknowledge issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const issue = context.payload.issue;
+            const title = (issue.title || '').toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const content = title + ' ' + body;
+            const isOwner = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(
+              issue.author_association
+            );
+
+            // --- Label triage ---
+            const labels = [];
+
+            // Kind labels
+            if (content.includes('feature request') || content.includes('[feature')) {
+              labels.push('enhancement');
+            } else if (content.includes('bug') || content.includes('error') || content.includes('crash') || content.includes('traceback')) {
+              labels.push('bug');
+            } else if (content.includes('question') || content.includes('how do i') || content.includes('how to')) {
+              labels.push('question');
+            }
+
+            // Area labels
+            if (content.includes('security') || content.includes('cve') || content.includes('vulnerability')) {
+              labels.push('security');
+            }
+            if (content.includes('performance') || content.includes('slow') || content.includes('memory leak')) {
+              labels.push('performance');
+            }
+            if (content.includes('documentation') || content.includes('docs')) {
+              labels.push('documentation');
+            }
+            if (content.includes('typescript') || content.includes('javascript') || content.includes('npm')) {
+              labels.push('javascript');
+            }
+
+            // Apply labels
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                issue_number: issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels
+              });
+            }
+
+            // --- Acknowledgment comment (external users only) ---
+            if (!isOwner) {
+              await github.rest.issues.createComment({
+                issue_number: issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: [
+                  `👋 Thanks for opening this issue, @${issue.user.login}!`,
+                  '',
+                  'A maintainer will review this shortly. In the meantime:',
+                  '- Make sure you\'ve included steps to reproduce (for bugs)',
+                  '- Check [existing issues](https://github.com/MervinPraison/PraisonAI-Frameworks/issues) for duplicates',
+                  '- Review [AGENTS.md](https://github.com/MervinPraison/PraisonAI-Frameworks/blob/main/AGENTS.md) and [docs/adding-a-framework.md](https://github.com/MervinPraison/PraisonAI-Frameworks/blob/main/docs/adding-a-framework.md)',
+                  '',
+                  '_A maintainer can trigger deeper analysis by commenting `@claude` on this issue._'
+                ].join('\n')
+              });
+            }
+
+            // --- For owner: add 'claude' label to trigger the code-fix job ---
+            if (isOwner) {
+              await github.rest.issues.addLabels({
+                issue_number: issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ['claude']
+              });
+            }
+
+  # ================================================================
+  # Job 2: Full Claude code-fix (owner/collaborator only)
+  # Triggers on: labeled 'claude', @claude comments, assignments
+  # ================================================================
+  claude-response:
+    # Allow: human users, github-actions[bot] (auto-comments/labels)
+    # Block: dependabot, cursor, renovate, other bots
+    # Skip 'opened' events — triage job handles those above
+    if: |
+      github.event.action != 'opened' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'claude') &&
+      (github.event_name != 'issue_comment' || contains(github.event.comment.body, '@claude')) &&
+      (github.event_name != 'pull_request_review' || contains(github.event.review.body, '@claude')) &&
+      (github.event_name != 'pull_request_review_comment' || contains(github.event.comment.body, '@claude')) &&
       (
         !contains(github.actor, '[bot]') ||
         github.actor == 'github-actions[bot]' ||
@@ -34,29 +134,48 @@ jobs:
       github.actor != 'cursor[bot]' &&
       github.actor != 'renovate[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CLAUDE_APP_ID }}
+          private-key: ${{ secrets.CLAUDE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Check for Fork PR
         id: check_fork
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GH_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const isPR = context.payload.issue?.pull_request
+            const isPR = context.eventName === 'pull_request'
               || context.eventName === 'pull_request_review'
-              || context.eventName === 'pull_request_review_comment';
+              || context.eventName === 'pull_request_review_comment'
+              || (context.payload.issue && context.payload.issue.pull_request);
+
             if (!isPR) {
               core.setOutput('is_pr', 'false');
               core.setOutput('is_fork', 'false');
-              core.setOutput('merge_state', '');
+              core.setOutput('can_push_fork', 'false');
               return;
             }
-            const prNumber = context.payload.pull_request?.number
-              || context.payload.issue?.number;
+
+            const prNumber = context.payload.pull_request
+              ? context.payload.pull_request.number
+              : context.payload.issue.number;
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber,
+              pull_number: prNumber
             });
+
             let mergeState = '';
             try {
               const gql = await github.graphql(
@@ -74,64 +193,84 @@ jobs:
             if (!mergeState) {
               mergeState = (pr.data.mergeable_state || pr.data.merge_state_status || '').toUpperCase();
             }
+
             core.setOutput('is_pr', 'true');
             core.setOutput('pr_number', String(prNumber));
             core.setOutput('pr_branch', pr.data.head.ref);
-            core.setOutput('head_repo', pr.data.head.repo?.full_name || '');
+            core.setOutput('head_repo', pr.data.head.repo.full_name);
             core.setOutput('merge_state', mergeState);
+
             const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const maintainerCanModify = pr.data.maintainer_can_modify === true;
+            core.setOutput('maintainer_can_modify', String(maintainerCanModify));
+
             if (pr.data.head.repo && pr.data.head.repo.full_name !== baseRepo) {
               core.setOutput('is_fork', 'true');
+              core.setOutput('can_push_fork', String(maintainerCanModify));
+              core.setOutput('fork_repo', pr.data.head.repo.full_name);
+              core.setOutput('clone_url', pr.data.head.repo.clone_url);
+              core.setOutput('branch', pr.data.head.ref);
               return;
             }
             core.setOutput('is_fork', 'false');
+            core.setOutput('can_push_fork', 'false');
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }}
-          ref: ${{ steps.check_fork.outputs.is_pr == 'true' && format('refs/pull/{0}/head', steps.check_fork.outputs.pr_number) || github.event.repository.default_branch }}
+          token: ${{ steps.app-token.outputs.token }}
 
-      - name: Fetch PR branch
-        if: steps.check_fork.outputs.is_pr == 'true' && steps.check_fork.outputs.is_fork != 'true'
+      - name: Fetch PR branch and Setup Remote
+        if: steps.check_fork.outputs.is_pr == 'true'
         env:
           PR_BRANCH: ${{ steps.check_fork.outputs.pr_branch }}
           PR_NUMBER: ${{ steps.check_fork.outputs.pr_number }}
+          IS_FORK: ${{ steps.check_fork.outputs.is_fork }}
+          CAN_PUSH_FORK: ${{ steps.check_fork.outputs.can_push_fork }}
+          FORK_REPO: ${{ steps.check_fork.outputs.fork_repo }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git fetch origin "pull/${PR_NUMBER}/head:${PR_BRANCH}"
           git checkout "${PR_BRANCH}"
           git fetch origin main
 
-      - name: Run Claude Code Action
-        uses: anthropics/claude-code-action@beta
+          if [ "${IS_FORK}" = "true" ] && [ "${CAN_PUSH_FORK}" = "true" ]; then
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${FORK_REPO}.git"
+          elif [ "${IS_FORK}" = "true" ]; then
+            # Block push: trick claude-code-action's `git fetch origin <branch>`
+            git remote set-url origin "file://$(pwd)"
+          fi
+
+      - uses: anthropics/claude-code-action@beta
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.check_fork.outputs.can_push_fork == 'true' && secrets.GH_TOKEN || steps.app-token.outputs.token }}
         with:
+          allowed_bots: 'praisonai-triage-agent[bot]'
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           model: claude-opus-4-8
           trigger_phrase: "@claude"
           label_trigger: "claude"
-          allowed_bots: "praisonai-triage-agent[bot]"
-          timeout_minutes: "30"
+
           direct_prompt: |
-            ${{ steps.check_fork.outputs.is_fork == 'true' && 'CRITICAL: FORK PR — comment only, do not push.\n\n' || (steps.check_fork.outputs.is_pr == 'true' && 'NOTE: Internal PR on MervinPraison/PraisonAI-Frameworks — you may push to this branch.\n\n' || '') }}
-            ${{ steps.check_fork.outputs.is_pr == 'true' && format('CONTEXT: PR #{0} on branch {1}. merge_state={2}.\n\n', steps.check_fork.outputs.pr_number, steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.merge_state) || '' }}
-            You are implementing changes in MervinPraison/PraisonAI-Frameworks (optional agent framework adapters for PraisonAI). Follow README.md and patterns under `src/praisonai_frameworks/`.
+            ${{ steps.check_fork.outputs.is_fork == 'true' && steps.check_fork.outputs.can_push_fork != 'true' && 'CRITICAL: THIS IS A PULL REQUEST FROM A FORK WITHOUT MAINTAINER EDITS. YOU DO NOT HAVE PUSH PERMISSIONS. ONLY READ FILES, VALIDATE CODE, AND PROVIDE COMMENTS/FEEDBACK ON THIS PR. DO NOT ATTEMPT TO PUSH OR CREATE PULL REQUESTS.\n\n' || (steps.check_fork.outputs.can_push_fork == 'true' && format('NOTE: Fork PR with maintainer edits allowed. Push directly to fork {0} branch {1}.\n\n', steps.check_fork.outputs.fork_repo, steps.check_fork.outputs.pr_branch) || (steps.check_fork.outputs.is_pr == 'true' && steps.check_fork.outputs.is_fork != 'true' && 'NOTE: Internal PR on MervinPraison/PraisonAI-Frameworks — you may push to this branch.\n\n' || (steps.check_fork.outputs.is_pr != 'true' && 'NOTE: This is an issue (not a PR). Create a new fix branch per STEP 3 below.\n\n' || ''))) }}
+            ${{ steps.check_fork.outputs.is_pr == 'true' && format('CONTEXT: PR #{0} on branch {1}. head.repo={2}, is_fork={3}, can_push_fork={4}, merge_state={5}.\n\n', steps.check_fork.outputs.pr_number, steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.head_repo, steps.check_fork.outputs.is_fork, steps.check_fork.outputs.can_push_fork, steps.check_fork.outputs.merge_state) || '' }}
+            You are implementing changes in MervinPraison/PraisonAI-Frameworks (optional agent framework adapters for PraisonAI). Follow AGENTS.md strictly.
 
             Primary scope: `src/praisonai_frameworks/`, `tests/`, `examples/`, `docs/`. Depends on `praisonaiagents` only — do not vendor core SDK here.
 
-            STEP 0 — GIT & GITHUB CLI:
+            STEP 0 — SETUP GIT IDENTITY & AUTH (GLOBAL — required for all repos):
             git config --global user.name "MervinPraison"
             git config --global user.email "454862+MervinPraison@users.noreply.github.com"
             gh auth setup-git
 
-            STEP 1 — ISSUE / PR:
-            Read the issue (or PR) and all comments. Implement what is described with minimal, focused changes.
+            STEP 1 — READ GUIDELINES:
+            Read AGENTS.md and docs/adding-a-framework.md.
 
             STEP 2 — LAYER VALIDATION (mandatory before coding):
-            This repo IS the **Frameworks** layer (`praisonai-frameworks`). Third-party framework adapters belong here.
+            This repo IS the **Frameworks** layer (`praisonai-frameworks`).
             - **Implement here:** CrewAI/AutoGen/LangGraph adapters, `praisonai.framework_adapters` entry points, lazy imports in `run()`
             - **Route to PraisonAI (core):** new adapter protocols, Agent runtime APIs → MervinPraison/PraisonAI
             - **Route to PraisonAI (wrapper):** CLI/YAML `framework:` wiring only → MervinPraison/PraisonAI
@@ -140,23 +279,28 @@ jobs:
             - **Reject:** duplicating core agent logic; heavy deps without optional extras in pyproject.toml
             If the issue belongs in another layer, explain why and do not implement here.
 
-            ${{ steps.check_fork.outputs.is_pr == 'true' && steps.check_fork.outputs.is_fork != 'true' && steps.check_fork.outputs.merge_state == 'DIRTY' && format('STEP 3 — RESOLVE MERGE CONFLICTS ON PR (branch: {0}, PR #{1}):\n- DO NOT create a new branch or PR\n- git fetch origin main && git rebase origin/main\n- Resolve conflicts: keep this PR intent, merge in main newer logic\n- git add -A && git rebase --continue (repeat until done)\n- git push --force-with-lease origin {0}\n- Run targeted pytest on changed paths\n- Comment files resolved and what you skipped\n', steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.pr_number) || '' }}
-            ${{ steps.check_fork.outputs.is_pr == 'true' && steps.check_fork.outputs.is_fork != 'true' && steps.check_fork.outputs.merge_state != 'DIRTY' && format('STEP 3 — IMPLEMENT ON EXISTING PR (branch: {0}, PR #{1}):\n- DO NOT create a new branch or PR\n- git checkout {0}\n- Implement minimal, focused fixes\n- Commit and push: git push origin {0}\n', steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.pr_number) || '' }}
-            ${{ steps.check_fork.outputs.is_pr != 'true' && 'STEP 3 — BRANCH (single name; reuse in STEP 5):\nBRANCH="claude/issue-${{ env.ISSUE_NUMBER_RESOLVED }}-$(date +%Y%m%d-%H%M%S)"\ngit checkout -b "$BRANCH"\n' || '' }}
+            ${{ steps.check_fork.outputs.is_pr == 'true' && (steps.check_fork.outputs.is_fork != 'true' || steps.check_fork.outputs.can_push_fork == 'true') && steps.check_fork.outputs.merge_state == 'DIRTY' && format('STEP 3 — RESOLVE MERGE CONFLICTS ON PR (branch: {0}, PR #{1}{2}):\n- DO NOT create a new branch or PR\n- git fetch origin main && git rebase origin/main\n- Resolve conflicts: keep this PR intent, merge in main newer logic\n- git add -A && git rebase --continue (repeat until done)\n- git push --force-with-lease origin {0}\n- Run targeted pytest on changed paths\n- Comment files resolved and what you skipped\n', steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.pr_number, steps.check_fork.outputs.can_push_fork == 'true' && format(', fork: {0}', steps.check_fork.outputs.fork_repo) || '') || '' }}
+            ${{ steps.check_fork.outputs.is_pr == 'true' && (steps.check_fork.outputs.is_fork != 'true' || steps.check_fork.outputs.can_push_fork == 'true') && steps.check_fork.outputs.merge_state != 'DIRTY' && format('STEP 3 — IMPLEMENT ON EXISTING PR (branch: {0}, PR #{1}{2}):\n- DO NOT create a new branch or PR\n- git checkout {0}\n- Implement minimal, focused fixes from reviewer feedback\n- Keep changes small and backward-compatible\n- Commit: git add -A && git commit -m "fix: <description>"\n- Push: git push origin {0}\n- Comment a summary of exact files modified and what you skipped\n', steps.check_fork.outputs.pr_branch, steps.check_fork.outputs.pr_number, steps.check_fork.outputs.can_push_fork == 'true' && format(', fork: {0}', steps.check_fork.outputs.fork_repo) || '') || '' }}
+            ${{ steps.check_fork.outputs.is_pr != 'true' && 'STEP 3 — BRANCH (single name; reuse in STEP 5):\nBRANCH="claude/issue-$ISSUE_NUMBER-$(date +%Y%m%d-%H%M%S)"\ngit checkout -b "$BRANCH"\n- Implement minimal, focused fixes per AGENTS.md\n' || '' }}
+
+            STEP 3-ALT — IMPLEMENT IN EXTERNAL REPO (PraisonAI core, Tools, Plugins):
+            When work must happen in a different repository, use `git -C` (no `cd`). Clone, branch, commit, push, and `gh pr create -R MervinPraison/<REPO_NAME>` with body referencing `MervinPraison/PraisonAI-Frameworks#$ISSUE_NUMBER`.
 
             STEP 4 — TEST / VERIFY:
-            Run targeted pytest (e.g. pytest tests/unit -q) or integration tests for the affected extra.
+            Run targeted pytest (e.g. `pytest tests/unit -q`) or integration tests for the affected extra.
 
-            ${{ steps.check_fork.outputs.is_pr == 'true' && 'STEP 5 — SKIP: Already on an open PR. Do NOT run gh pr create.\n' || format('STEP 5 — COMMIT, PUSH, OPEN PR (mandatory if you produced commits):\ngit add -A\ngit commit -m "feat: <short summary> (fixes #{0})"\ngit push -u origin "$BRANCH"\ngh pr create --repo "{1}" --base main --head "$BRANCH" --title "feat: <short title>" --body "Fixes #{0}"\nCRITICAL: Do not stop after `git push`. You MUST complete `gh pr create` and post the PR URL on the issue.\n', env.ISSUE_NUMBER_RESOLVED, github.repository) }}
-
+            ${{ steps.check_fork.outputs.is_pr == 'true' && 'STEP 5 — SKIP: Already on an open PR. Do NOT run gh pr create.\n' || format('STEP 5 — COMMIT, PUSH, OPEN PR (mandatory if you produced commits):\ngit add -A\ngit commit -m "feat: <short summary> (fixes #$ISSUE_NUMBER)"\ngit push -u origin "$BRANCH"\ngh pr create --repo "{0}" --base main --head "$BRANCH" --title "feat: <short title>" --body "Fixes #$ISSUE_NUMBER"\nCRITICAL: Do not stop after `git push`. You MUST complete `gh pr create` and post the PR URL on the issue.\n', github.repository) }}
+            NOTE: If you worked on an external repo, the wrapper action will report "No commits" for the main repo at the end. This is expected, do not worry about it.
           allowed_tools: |
             Bash(git:*)
             Bash(python:*)
             Bash(pip:*)
+            Bash(conda:*)
             Bash(pytest:*)
             Bash(gh:*)
             Bash(python -m pytest:*)
             Bash(python -m pip:*)
+            Bash(poetry:*)
             View
             GlobTool
             GrepTool
@@ -166,3 +310,61 @@ jobs:
             mcp__github__get_issue
             mcp__github__get_issue_comments
             mcp__github__update_issue
+          timeout_minutes: 30
+
+      - name: Kick review chain for bot-created PR
+        if: |
+          steps.check_fork.outputs.is_pr != 'true' &&
+          (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
+          github.event.issue != null
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const path = require('path');
+            const chain = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-pr-review-chain.js'));
+            const issueNumber = context.payload.issue.number;
+            await chain.kickReviewChainForIssue(
+              github, context.repo.owner, context.repo.repo, issueNumber, core
+            );
+
+      - name: Sync pipeline status labels for PR
+        if: steps.check_fork.outputs.is_pr == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const path = require('path');
+            const ps = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/pipeline-status.js'));
+            const prNumber = parseInt('${{ steps.check_fork.outputs.pr_number }}', 10);
+            await ps.ensurePipelineLabels(github, context.repo.owner, context.repo.repo, core);
+            await ps.syncPipelineLabels(github, context.repo.owner, context.repo.repo, prNumber, core);
+
+      - name: Dispatch merge gate when PR pipeline ready
+        if: steps.check_fork.outputs.is_pr == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const path = require('path');
+            const mergeGate = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/merge-gate.js'));
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = parseInt('${{ steps.check_fork.outputs.pr_number }}', 10);
+            const check = await mergeGate.evaluatePipelineQuiescent(
+              github, owner, repo, prNumber, core, {
+                skipGlobalClaudeRunCheck: true,
+                skipRecentClaudeCooldown: true,
+              }
+            );
+            if (!check.ready) {
+              core.info(`PR #${prNumber} not ready for merge gate: ${check.reasons.join(', ')}`);
+              return;
+            }
+            await github.rest.repos.createDispatchEvent({
+              owner,
+              repo,
+              event_type: 'claude-merge-gate',
+              client_payload: { pr_number: prNumber },
+            });
+            core.info(`Dispatched merge gate for PR #${prNumber}`);
