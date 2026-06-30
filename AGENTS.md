@@ -125,6 +125,7 @@ See also: [docs/adding-a-framework.md](docs/adding-a-framework.md), [examples/th
 | `ag2` | `[ag2]` | stub / placeholder |
 | `langgraph` | `[langgraph]` | `langgraph.adapter:LangGraphAdapter` |
 | `openai_agents` | `[openai-agents]` | `openai_agents.adapter:OpenAIAgentsAdapter` |
+| `agno` | `[agno]` | `agno.adapter:AgnoAdapter` |
 
 Family routers implement `resolve()` to pick a concrete adapter from config/version.
 
@@ -133,13 +134,9 @@ Family routers implement `resolve()` to pick a concrete adapter from config/vers
 ## 6. Testing standards
 
 ```bash
-# Base — local development (installs praisonaiagents from PyPI)
-pip install -e ".[dev]"
+# Base (no optional frameworks)
+pip install -e praisonai-package/src/praisonai-agents -e ".[dev]"
 pytest tests/unit -q
-
-# Base — CI multi-repo checkout (uses local editable praisonaiagents when present)
-[ -d praisonai-package ] && pip install -e praisonai-package/src/praisonai-agents
-pip install -e ".[dev]" && pytest tests/unit -q
 
 # Per-framework
 pip install -e ".[langgraph]"
@@ -147,9 +144,10 @@ pytest tests/integration/langgraph_adapter -q
 
 pip install -e ".[openai-agents]"
 pytest tests/integration/openai_agents_adapter -q
-```
 
-> The `praisonai-package/` directory only exists in the CI multi-repo checkout. For local development, `pip install -e ".[dev]"` pulls `praisonaiagents` from PyPI — no extra checkout required.
+pip install -e ".[agno]"
+pytest tests/integration/agno_adapter -q
+```
 
 | Layer | Location | Gate |
 |-------|----------|------|
@@ -158,7 +156,7 @@ pytest tests/integration/openai_agents_adapter -q
 | Integration | `tests/integration/<name>_adapter/` | `pytest.importorskip("<pkg>")` |
 | Live API | `test_*_live.py` | `OPENAI_API_KEY`; optional `PRAISONAI_LIVE_TESTS` |
 
-**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph", "openai-agents"]` — unit tests run on **every** row; do not require optional deps on the crewai/autogen rows.
+**CI matrix** (`.github/workflows/ci.yml`): `extra: ["", "crewai", "autogen", "langgraph", "openai-agents", "agno"]` — unit tests run on **every** row; do not require optional deps on the crewai/autogen rows.
 
 ---
 

@@ -26,6 +26,21 @@ def _autogen_v4_probe() -> bool:
     )
 
 
+def _agno_probe() -> bool:
+    try:
+        importlib.metadata.distribution("agno")
+    except importlib.metadata.PackageNotFoundError:
+        return False
+    if importlib.util.find_spec("agno") is None:
+        return False
+    try:
+        from agno.agent import Agent  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
 def _openai_agents_probe() -> bool:
     try:
         importlib.metadata.distribution("openai-agents")
@@ -51,6 +66,7 @@ _PROBES: dict[str, Callable[[], bool]] = {
         and importlib.util.find_spec("langgraph.prebuilt") is not None
     ),
     "openai_agents": _openai_agents_probe,
+    "agno": _agno_probe,
 }
 
 
