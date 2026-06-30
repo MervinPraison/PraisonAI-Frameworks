@@ -312,7 +312,7 @@ jobs:
             mcp__github__update_issue
           timeout_minutes: 30
 
-      - name: Kick review chain for bot-created PR
+      - name: Post FINAL @claude when issue PR opens
         if: |
           steps.check_fork.outputs.is_pr != 'true' &&
           (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
@@ -322,9 +322,9 @@ jobs:
           github-token: ${{ secrets.GH_TOKEN }}
           script: |
             const path = require('path');
-            const chain = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-pr-review-chain.js'));
+            const review = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/pr-review.js'));
             const issueNumber = context.payload.issue.number;
-            await chain.kickReviewChainForIssue(
+            await review.triggerFinalReviewForIssue(
               github, context.repo.owner, context.repo.repo, issueNumber, core
             );
 
