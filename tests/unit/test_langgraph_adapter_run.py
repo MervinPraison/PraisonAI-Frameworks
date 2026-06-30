@@ -37,8 +37,10 @@ def test_langgraph_adapter_run_single_task_mocked():
 
     adapter = LangGraphAdapter()
     with patch.object(adapter, "_resolve_chat_model", return_value=MagicMock()), patch.object(
-        adapter, "_create_react_agent", return_value=mock_agent
-    ):
+        adapter, "_to_langchain_tools", return_value=[]
+    ), patch.object(adapter, "_create_react_agent", return_value=mock_agent), patch.object(
+        adapter, "_invoke_agent", return_value="LangGraph summary"
+    ) as mock_invoke:
         result = adapter.run(
             config,
             [{"model": "openai/gpt-4o-mini", "api_key": "test-key"}],
@@ -48,7 +50,7 @@ def test_langgraph_adapter_run_single_task_mocked():
 
     assert "### LangGraph Output ###" in result
     assert "LangGraph summary" in result
-    mock_agent.invoke.assert_called_once()
+    mock_invoke.assert_called_once()
 
 
 def test_langgraph_collect_ordered_tasks_respects_context():
