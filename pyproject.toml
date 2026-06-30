@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "praisonai-frameworks"
-version = "0.1.0"
+version = "0.1.1"
 description = "Optional agent framework adapters for PraisonAI (CrewAI, AutoGen, extensions)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -44,9 +44,9 @@ autogen_v4 = "praisonai_frameworks.autogen.adapter_v4:AutoGenV4Adapter"
 ag2 = "praisonai_frameworks.autogen.adapter_ag2:AG2Adapter"
 
 [project.urls]
-Homepage = "https://docs.praison.ai"
+Homepage = "https://praison.ai/docs"
 Repository = "https://github.com/MervinPraison/PraisonAI-Frameworks"
-Documentation = "https://docs.praison.ai/frameworks"
+Documentation = "https://praison.ai/docs/frameworks"
 Issues = "https://github.com/MervinPraison/PraisonAI-Frameworks/issues"
 
 [tool.hatch.build.targets.wheel]
