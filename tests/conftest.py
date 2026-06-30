@@ -52,3 +52,35 @@ def minimal_agents_config():
 @pytest.fixture
 def mock_llm_config():
     return [{"model": "openai/gpt-4o-mini", "api_key": "test-key"}]
+
+
+@pytest.fixture
+def minimal_autogen_config():
+    return {
+        "framework": "autogen",
+        "topic": "Test topic",
+        "roles": {
+            "assistant": {
+                "role": "Assistant",
+                "goal": "Help with tasks",
+                "backstory": "Helpful assistant",
+                "tasks": {
+                    "task1": {
+                        "description": "Summarise {topic}",
+                        "expected_output": "A short summary",
+                    }
+                },
+            }
+        },
+    }
+
+
+@pytest.fixture
+def mock_crewai_completion():
+    from unittest.mock import MagicMock
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message = MagicMock()
+    mock_response.choices[0].message.content = "Task completed successfully."
+    return mock_response
