@@ -14,7 +14,6 @@ def test_entry_points_registered():
 
 
 def test_autogen_family_is_router():
-    pytest.importorskip("praisonaiagents.frameworks")
     from praisonai_frameworks.autogen.family import AutoGenFamilyAdapter
 
     adapter = AutoGenFamilyAdapter()
