@@ -26,6 +26,21 @@ def _autogen_v4_probe() -> bool:
     )
 
 
+def _openai_agents_probe() -> bool:
+    try:
+        importlib.metadata.distribution("openai-agents")
+    except importlib.metadata.PackageNotFoundError:
+        return False
+    if importlib.util.find_spec("agents") is None:
+        return False
+    try:
+        from agents import Runner  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
 _PROBES: dict[str, Callable[[], bool]] = {
     "crewai": lambda: importlib.util.find_spec("crewai") is not None,
     "autogen": lambda: importlib.util.find_spec("autogen") is not None,
@@ -35,6 +50,7 @@ _PROBES: dict[str, Callable[[], bool]] = {
         importlib.util.find_spec("langgraph") is not None
         and importlib.util.find_spec("langgraph.prebuilt") is not None
     ),
+    "openai_agents": _openai_agents_probe,
 }
 
 

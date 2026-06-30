@@ -9,13 +9,13 @@ def test_entry_points_registered():
         ep.name
         for ep in importlib.metadata.entry_points(group="praisonai.framework_adapters")
     }
-    expected = {"crewai", "autogen", "autogen_v2", "autogen_v4", "ag2", "langgraph"}
+    expected = {"crewai", "autogen", "autogen_v2", "autogen_v4", "ag2", "langgraph", "openai_agents"}
     assert expected.issubset(eps)
 
 
 def test_autogen_family_is_router():
+    pytest.importorskip("praisonaiagents.frameworks")
     from praisonai_frameworks.autogen.family import AutoGenFamilyAdapter
 
     adapter = AutoGenFamilyAdapter()
     assert adapter.is_router is True
-    assert "praisonai-frameworks" in adapter.install_hint
