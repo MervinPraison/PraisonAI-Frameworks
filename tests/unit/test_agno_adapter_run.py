@@ -184,7 +184,7 @@ def test_agno_rejects_not_provided_api_key():
             )
 
 
-def test_agno_handoff_warning(caplog):
+def test_agno_single_task_handoff_uses_handoff_path():
     adapter = AgnoAdapter()
     config = {
         "roles": {
@@ -192,19 +192,24 @@ def test_agno_handoff_warning(caplog):
                 "role": "Triage",
                 "goal": "Route",
                 "backstory": "Router",
-                "handoff": {"to": ["english"]},
+                "handoff": {"to": ["English"]},
                 "tasks": {"route": {"description": "Route", "expected_output": "Done"}},
             },
             "english": {
                 "role": "English",
                 "goal": "English",
                 "backstory": "English",
-                "tasks": {"greet": {"description": "Hi", "expected_output": "Hi"}},
             },
         }
     }
     with patch.object(adapter, "_ensure_agno"), patch.object(
-        adapter, "_run_sequential", return_value="done"
-    ):
-        adapter.run(config, [{"api_key": "k"}], "topic")
-    assert any("handoff.to" in r.message for r in caplog.records)
+        adapter, "_require_api_key"
+    ), patch.object(
+        adapter, "_build_agent_registry", return_value=({}, {})
+    ), patch.object(adapter, "_run_with_handoffs", return_value="handoff") as mock_handoff, patch.object(
+        adapter, "_run_sequential"
+    ) as mock_seq:
+        result = adapter.run(config, [{"api_key": "k"}], "topic")
+    assert result.endswith("handoff")
+    mock_handoff.assert_called_once()
+    mock_seq.assert_not_called()
