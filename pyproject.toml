@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 crewai = [
     "crewai>=0.157.0",
+    "litellm>=1.81.0",
     "praisonai-tools>=0.1.0",
 ]
 autogen = [
