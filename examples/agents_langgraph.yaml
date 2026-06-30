@@ -1,0 +1,20 @@
+framework: langgraph
+topic: Example research task
+process: sequential
+roles:
+  researcher:
+    role: Research Analyst
+    goal: Gather accurate information about {topic}
+    backstory: Expert researcher
+    tasks:
+      research:
+        description: Research {topic}
+        expected_output: A short summary of key findings
+  writer:
+    role: Technical Writer
+    goal: Turn research into a clear report
+    backstory: Skilled writer who summarises findings
+    tasks:
+      write:
+        description: Write a concise report on {topic}
+        expected_output: A polished paragraph

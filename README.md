@@ -3,7 +3,7 @@
 Optional agent framework adapters for [PraisonAI](https://github.com/MervinPraison/PraisonAI).
 
 Implements the `praisonai.framework_adapters` entry-point group so YAML `framework:` values
-(`crewai`, `autogen`, …) resolve without bloating the core SDK or wrapper wheel.
+(`crewai`, `autogen`, `langgraph`, …) resolve without bloating the core SDK or wrapper wheel.
 
 ## Install
 
@@ -16,6 +16,9 @@ pip install praisonai-frameworks[crewai]
 
 # AutoGen v0.2 backend
 pip install praisonai-frameworks[autogen]
+
+# LangGraph backend
+pip install praisonai-frameworks[langgraph]
 ```
 
 ## Usage
@@ -43,7 +46,7 @@ praisonai run agents.yaml
 
 - Depends on **`praisonaiagents` only** (protocol + base helpers in `praisonaiagents.frameworks`)
 - Registers adapters via setuptools entry points — no wrapper import required
-- Lazy-imports CrewAI / AutoGen inside `run()` only
+- Lazy-imports CrewAI / AutoGen / LangGraph inside `run()` only
 
 ## Adding a framework
 

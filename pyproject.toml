@@ -10,7 +10,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10,<3.15"
 authors = [{ name = "Mervin Praison" }]
-keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "framework"]
+keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "langgraph", "framework"]
 dependencies = [
     "praisonaiagents>=1.6.82",
 ]
@@ -26,6 +26,11 @@ autogen = [
     "crewai",
 ]
 ag2 = ["ag2>=0.11.0", "praisonai-tools>=0.1.0"]
+langgraph = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "praisonai-tools>=0.1.0",
+]
 autogen-v4 = [
     "autogen-agentchat>=0.4.0",
     "autogen-ext[openai]>=0.4.0",
@@ -33,13 +38,16 @@ autogen-v4 = [
     "praisonai-tools>=0.1.0",
     "crewai",
 ]
-all = ["praisonai-frameworks[crewai,autogen]"]
+all = ["praisonai-frameworks[crewai,autogen,langgraph]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.entry-points."praisonai.framework_adapters"]
 crewai = "praisonai_frameworks.crewai.adapter:CrewAIAdapter"
 autogen = "praisonai_frameworks.autogen.family:AutoGenFamilyAdapter"
 autogen_v2 = "praisonai_frameworks.autogen.adapter_v2:AutoGenAdapter"
+autogen_v4 = "praisonai_frameworks.autogen.adapter_v4:AutoGenV4Adapter"
+ag2 = "praisonai_frameworks.autogen.adapter_ag2:AG2Adapter"
+langgraph = "praisonai_frameworks.langgraph.adapter:LangGraphAdapter"
 
 [project.urls]
 Homepage = "https://praison.ai/docs"
