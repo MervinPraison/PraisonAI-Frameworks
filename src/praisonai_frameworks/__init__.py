@@ -1,5 +1,5 @@
 """Optional third-party agent framework adapters for PraisonAI."""
 
-__version__ = "0.1.3"
+__version__ = "0.1.6"
 
 __all__ = ["__version__"]

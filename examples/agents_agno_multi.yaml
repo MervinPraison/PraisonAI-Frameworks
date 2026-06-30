@@ -1,0 +1,16 @@
+framework: agno
+topic: numbers
+roles:
+  writer:
+    role: Writer
+    goal: Write concise text
+    backstory: You write short outputs only.
+    tasks:
+      draft:
+        description: Write the number 6 on its own.
+        expected_output: "6"
+      polish:
+        description: Double the previous result and reply with only the number.
+        expected_output: "12"
+        context:
+          - draft
