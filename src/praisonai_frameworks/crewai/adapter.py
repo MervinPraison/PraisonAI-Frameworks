@@ -14,32 +14,6 @@ from praisonai_frameworks.base import BaseFrameworkAdapter
 logger = logging.getLogger(__name__)
 
 
-def _ensure_utf8_console() -> None:
-    """Reconfigure stdout/stderr to UTF-8 on Windows.
-
-    CrewAI's event bus prints emoji (e.g. 🚀, ✅) from sync handlers. On Windows
-    consoles using a legacy code page (cp1252), encoding these characters raises
-    ``UnicodeEncodeError`` ("'charmap' codec can't encode character"), which the
-    event bus reports as ``[CrewAIEventsBus] Sync handler error`` noise even
-    though the run succeeds. Reconfiguring the streams to UTF-8 avoids the noise.
-    """
-    if _sys.platform != "win32":
-        return
-    for stream in (_sys.stdout, _sys.stderr):
-        if stream is None:
-            continue
-        encoding = getattr(stream, "encoding", None)
-        if encoding and encoding.lower() in ("utf-8", "utf8"):
-            continue
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is None:
-            continue
-        try:
-            reconfigure(encoding="utf-8")
-        except Exception:  # noqa: BLE001
-            logger.debug("Could not reconfigure %s to UTF-8", stream, exc_info=True)
-
-
 class CrewAIAdapter(BaseFrameworkAdapter):
     name = "crewai"
     install_hint = 'pip install "praisonai-frameworks[crewai]"'
@@ -63,7 +37,6 @@ class CrewAIAdapter(BaseFrameworkAdapter):
             from crewai import Agent, Crew, Task
             from crewai.telemetry import Telemetry
 
-            _ensure_utf8_console()
             logging.getLogger("crewai.cli.config").setLevel(logging.ERROR)
 
             with scoped_telemetry_disable(Telemetry):

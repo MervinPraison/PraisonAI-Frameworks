@@ -5,39 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-try:
-    from praisonaiagents.frameworks.base import BaseFrameworkAdapter as _CoreBase
-except ImportError:
-    class _CoreBase:
-        """Local fallback used when ``praisonaiagents.frameworks`` is unavailable.
-
-        Published ``praisonaiagents`` releases do not yet ship the
-        ``frameworks`` package. Falling back to this minimal base keeps
-        ``praisonai-frameworks`` importable and usable from a PyPI-only
-        install instead of crashing at import time. Once core ships
-        ``praisonaiagents.frameworks.base`` the real base is used instead.
-        """
-
-        DEFAULT_MODEL = "openai/gpt-4o-mini"
-        name: str = ""
-        install_hint: str = ""
-        is_router: bool = False
-        requires_tools_extra: bool = False
-
-        def is_available(self) -> bool:
-            raise NotImplementedError
-
-        def run(self, *args: Any, **kwargs: Any) -> str:
-            raise NotImplementedError
-
-        @staticmethod
-        def _format_template(template: Any, **values: Any) -> Any:
-            if isinstance(template, str):
-                try:
-                    return template.format(**values)
-                except (KeyError, IndexError, ValueError):
-                    return template
-            return template
+from praisonaiagents.frameworks.base import BaseFrameworkAdapter as _CoreBase
 
 
 class BaseFrameworkAdapter(_CoreBase):
