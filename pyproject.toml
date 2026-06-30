@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "praisonai-frameworks"
-version = "0.1.8"
+version = "0.1.9"
 description = "Optional agent framework adapters for PraisonAI (CrewAI, AutoGen, extensions)"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10,<3.15"
 authors = [{ name = "Mervin Praison" }]
-keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "framework", "openai-agents", "langgraph", "agno", "google-adk"]
+keywords = ["ai", "agents", "praisonai", "crewai", "autogen", "framework", "openai-agents", "langgraph", "agno", "google-adk", "pydantic-ai"]
 dependencies = [
     "praisonaiagents>=1.6.82",
 ]
@@ -51,7 +51,11 @@ google-adk = [
     "google-adk[extensions]>=2.3.0,<2.4",
     "praisonai-tools>=0.1.0",
 ]
-all = ["praisonai-frameworks[crewai,autogen,langgraph,openai-agents,agno]"]
+pydantic-ai = [
+    "pydantic-ai[openai,google]>=0.8.0,<0.9",
+    "praisonai-tools>=0.1.0",
+]
+all = ["praisonai-frameworks[crewai,autogen,langgraph,openai-agents,agno,pydantic-ai]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.entry-points."praisonai.framework_adapters"]
@@ -64,6 +68,7 @@ langgraph = "praisonai_frameworks.langgraph.adapter:LangGraphAdapter"
 openai_agents = "praisonai_frameworks.openai_agents.adapter:OpenAIAgentsAdapter"
 agno = "praisonai_frameworks.agno.adapter:AgnoAdapter"
 google_adk = "praisonai_frameworks.google_adk.adapter:GoogleAdkAdapter"
+pydantic_ai = "praisonai_frameworks.pydantic_ai.adapter:PydanticAiAdapter"
 
 [project.urls]
 Homepage = "https://praison.ai/docs"

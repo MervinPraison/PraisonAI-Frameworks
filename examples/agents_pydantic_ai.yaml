@@ -1,0 +1,11 @@
+framework: pydantic_ai
+topic: Quick task
+roles:
+  helper:
+    role: Helper
+    goal: Answer briefly
+    backstory: Helpful assistant
+    tasks:
+      answer:
+        description: Reply with exactly OK.
+        expected_output: OK
