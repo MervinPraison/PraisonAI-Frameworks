@@ -62,15 +62,16 @@ class LangGraphAdapter(BaseFrameworkAdapter):
         return self._normalise_model_name(CoreBase._resolve_llm(self, spec, llm_config))
 
     def _resolve_chat_model(self, spec: Any, llm_config: Optional[List[Dict]]):
-        from langchain_openai import ChatOpenAI
-
-        base = llm_config[0].get("base_url") if llm_config else None
-        key = (llm_config[0].get("api_key") if llm_config else None) or os.environ.get(
-            "OPENAI_API_KEY"
+        first_config = (
+            llm_config[0]
+            if llm_config and isinstance(llm_config[0], dict)
+            else {}
         )
+        base = first_config.get("base_url")
+        key = first_config.get("api_key") or os.environ.get("OPENAI_API_KEY")
         model = self._resolve_model_name(spec, llm_config)
 
-        kwargs: Dict[str, Any] = {"model": model}
+        kwargs: Dict[str, Any] = {}
         if key:
             kwargs["api_key"] = key
         if base:
@@ -79,7 +80,15 @@ class LangGraphAdapter(BaseFrameworkAdapter):
             raise ValueError(
                 "LangGraph requires an API key. Set OPENAI_API_KEY or pass api_key in llm_config."
             )
-        return ChatOpenAI(**kwargs)
+
+        try:
+            from langchain.chat_models import init_chat_model
+
+            return init_chat_model(model, **kwargs)
+        except Exception:
+            from langchain_openai import ChatOpenAI
+
+            return ChatOpenAI(model=model, **kwargs)
 
     def _extract_message_content(self, message: Any) -> str:
         content = getattr(message, "content", message)
@@ -151,16 +160,8 @@ class LangGraphAdapter(BaseFrameworkAdapter):
         return tools
 
     def _import_langgraph_module(self, submodule: str):
-        """Import langgraph submodules without local test-directory shadowing."""
+        """Import langgraph submodules."""
         import importlib
-        import sys
-
-        cached = sys.modules.get("langgraph")
-        root = submodule.split(".")[0]
-        if cached is not None and not hasattr(cached, root):
-            for name in list(sys.modules):
-                if name == "langgraph" or name.startswith("langgraph."):
-                    del sys.modules[name]
 
         return importlib.import_module(f"langgraph.{submodule}")
 
@@ -257,7 +258,7 @@ class LangGraphAdapter(BaseFrameworkAdapter):
         END = graph_mod.END
         START = graph_mod.START
         StateGraph = graph_mod.StateGraph
-        from typing_extensions import TypedDict
+        from typing import TypedDict
 
         class GraphState(TypedDict):
             outputs: Dict[str, str]
