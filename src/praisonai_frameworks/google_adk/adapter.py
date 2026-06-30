@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 import re
@@ -194,8 +195,9 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             name = getattr(tool, "name", fallback_name)
             desc = getattr(tool, "description", name) or name
 
-            def _wrapped(**kwargs):
-                return inner(**kwargs)
+            @functools.wraps(inner)
+            def _wrapped(*args, **kwargs):
+                return inner(*args, **kwargs)
 
             _wrapped.__name__ = name
             _wrapped.__doc__ = desc
@@ -205,8 +207,9 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             name = getattr(tool, "name", fallback_name)
             desc = getattr(tool, "description", name) or name
 
-            def _bound(**kwargs):
-                return tool.run(**kwargs)
+            @functools.wraps(tool.run)
+            def _bound(*args, **kwargs):
+                return tool.run(*args, **kwargs)
 
             _bound.__name__ = name
             _bound.__doc__ = desc
@@ -222,6 +225,7 @@ class GoogleAdkAdapter(BaseFrameworkAdapter):
             name = getattr(tool, "__name__", fallback_name)
             desc = getattr(tool, "__doc__", None) or name
 
+            @functools.wraps(tool)
             def _wrapped(*args, **kwargs):
                 return tool(*args, **kwargs)
 

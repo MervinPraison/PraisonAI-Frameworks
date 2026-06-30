@@ -326,3 +326,38 @@ def test_google_adk_to_adk_tool_does_not_mutate_shared_callable():
     assert shared_tool.__doc__ == original_doc
     assert wrapped is not None
     assert wrapped.__name__ == original_name
+
+
+def test_google_adk_to_adk_tool_preserves_parameter_signature():
+    import inspect
+
+    adapter = GoogleAdkAdapter()
+
+    def search_docs(query: str, limit: int = 5) -> str:
+        """Search the docs"""
+        return query
+
+    class WithFunc:
+        name = "search_docs"
+        description = "Search the docs"
+        _func = staticmethod(search_docs)
+
+    class WithRun:
+        name = "search_docs"
+        description = "Search the docs"
+
+        def run(self, query: str, limit: int = 5) -> str:
+            """Search the docs"""
+            return query
+
+    with patch.dict(
+        "sys.modules",
+        {"google.adk.tools.function_tool": MagicMock(FunctionTool=lambda fn: fn)},
+    ):
+        plain = adapter._to_adk_tool(search_docs, "fallback")
+        func_attr = adapter._to_adk_tool(WithFunc(), "fallback")
+        run_attr = adapter._to_adk_tool(WithRun(), "fallback")
+
+    for wrapped in (plain, func_attr, run_attr):
+        params = list(inspect.signature(wrapped).parameters)
+        assert params == ["query", "limit"]
