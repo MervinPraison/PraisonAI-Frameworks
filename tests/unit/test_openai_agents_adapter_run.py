@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 pytest.importorskip("praisonaiagents.frameworks")
-pytest.importorskip("agents")
 
 from praisonai_frameworks.openai_agents.adapter import OpenAIAgentsAdapter
 
