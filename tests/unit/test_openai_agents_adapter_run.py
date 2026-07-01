@@ -88,6 +88,8 @@ def test_openai_agents_normalise_model_name():
 
 
 def test_openai_agents_missing_api_key_raises():
+    pytest.importorskip("agents")
+
     adapter = OpenAIAgentsAdapter()
     config = {
         "roles": {
@@ -110,6 +112,8 @@ def test_openai_agents_missing_api_key_raises():
 
 
 def test_run_config_wires_api_key_and_base_url():
+    pytest.importorskip("agents")
+
     adapter = OpenAIAgentsAdapter()
     llm_config = [{"api_key": "test-key", "base_url": "https://example.test/v1"}]
 
